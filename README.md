@@ -24,14 +24,39 @@ npm run tauri dev
 
 ## Build the real installer (creates desktop shortcut + Start Menu entry)
 
+Building a Windows installer needs an actual Windows toolchain (MSVC +
+WebView2), which this dev machine doesn't have. Don't try `npm run
+tauri build` here for a real release — use the GitHub Actions workflow
+instead (see below), which builds on a real Windows runner.
+
+Local `npm run tauri build` only works if you're actually developing
+from a Windows machine at some point.
+
+## Publishing a release
+
+`.github/workflows/release.yml` builds the Windows installer on
+`windows-latest` and attaches it to a GitHub Release, triggered by
+pushing a version tag:
+
 ```
-npm run tauri build
+# bump "version" in src-tauri/tauri.conf.json first, then:
+git tag v0.1.0
+git push origin v0.1.0
 ```
 
-Output: `src-tauri/target/release/bundle/nsis/GSPT_<version>_x64-setup.exe`
+Check the Actions tab for build progress (~5-10 min). It publishes as
+a **draft** release — review it, download the installer yourself to
+sanity-check it, then hit "Publish" on GitHub when satisfied.
 
-Must be run on Windows. Cross-compiling Windows installers from Linux
-isn't reliable enough to bother with — run this step on your machine.
+The installer is unsigned (no paid code-signing cert), so Windows
+SmartScreen will show an "unknown publisher" warning on first run.
+Normal for an indie/free app — "More info" -> "Run anyway" gets past
+it. Worth a line in the release notes so people aren't caught off
+guard.
+
+First-time setup: GitHub Actions needs write access to create the
+release. Settings -> Actions -> General -> Workflow permissions ->
+"Read and write permissions", if it's not already on.
 
 ## Branch workflow
 
