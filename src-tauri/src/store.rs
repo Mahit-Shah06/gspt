@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct WatchlistItem {
     pub id: String,
     pub kind: String, // "yahoo" | "mf_in"
@@ -13,6 +14,7 @@ pub struct WatchlistItem {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct Settings {
     pub refresh_interval_secs: u64,
 }

@@ -17,6 +17,7 @@ pub struct MfHistoryPoint {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct MfData {
     pub scheme_name: Option<String>,
     pub latest_nav: Option<f64>,

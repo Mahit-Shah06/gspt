@@ -5,6 +5,7 @@ const YF_BASE: &str = "https://query1.finance.yahoo.com/v8/finance/chart/";
 const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct Quote {
     pub symbol: Option<String>,
     pub price: Option<f64>,
