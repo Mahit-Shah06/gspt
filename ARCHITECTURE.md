@@ -82,43 +82,86 @@ app.js → invoke('get_quote', { symbol }) → commands::get_quote → market::f
 
 ## Gold / Silver
 
-Direct commodity price — COMEX gold/silver futures (`GC=F`, `SI=F`),
-real traded USD/oz prices, not something computed from other numbers.
-Converted client-side to ₹/10g and ₹/kg using the live USD-INR rate
-(`INR=X`). This will track spot price accurately but can sit 1-3% off a
-local jeweler/MCX quote — duty, GST, and local premium aren't part of a
-futures price, and no free API has that number. ETFs like `GOLDBEES.NS`
-/ `SILVERBEES.NS` are addable through the normal watchlist search, not
-baked into the gold/silver cards.
+Two data sources, shown together, not conflated:
+
+- **COMEX spot** (`GC=F`, `SI=F`) — real global futures price, USD/oz.
+- **NSE ETFs** (`GOLDBEES.NS`, `SILVERBEES.NS`) — real India-traded prices,
+  INR. This replaced an earlier approach that computed an implied INR
+  figure from spot × USD-INR fx rate; that was always an approximation
+  (no duty/GST/premium in a futures price). The ETF price is real
+  traded data, not something derived — still not identical to a local
+  jeweler/MCX quote (ETF tracking error, expense ratio drag over time),
+  but a meaningfully more honest number than a computed conversion.
+
+Which one is "primary" (bigger number, drives the row/chart) flips with
+the Settings currency toggle: INR mode leads with the ETF, native mode
+leads with COMEX spot. The other one always stays visible as secondary
+context in the sub-line / stats grid — never fully hidden.
+
+**Gold/Silver ratio** — third pinned row below Silver. `ratio = gold
+price ÷ silver price`, computed from data already being fetched (no
+extra API calls for the live number). Detail view chart fetches gold
++ silver history for the selected range in parallel and divides them
+point-by-point (matched by exact timestamp — COMEX gold/silver share
+the same exchange calendar, so this holds up in practice; a point
+without a same-timestamp counterpart on the other side is just
+dropped rather than guessed at).
 
 ## Decisions log
 
 - **Market scope:** both India and US (NSE/.NS, BSE/.BO, and US
   tickers all through the same Yahoo endpoint).
-- **Gold/Silver:** direct futures price + INR conversion, shown as
-  fixed cards, separate from the watchlist. ETF alternative available
-  via normal add-to-watchlist flow, not automatic.
+- **Layout:** single full-width scrollable list — gold, silver, the
+  gold/silver ratio, then the user's own watchlist, all one list, one
+  scrollbar. Earlier version had a permanently-visible two-column
+  layout (list + empty chart panel); replaced because the second panel
+  sat empty most of the time. Detail view (chart + stats) is now an
+  overlay, only present when something's actually selected.
+- **Adding items:** a persistent search bar (Yahoo symbol/company
+  search + AMFI mutual fund name search merged into one result list),
+  not a modal with separate tabs. Each result has an inline "+".
+- **Hiding pinned items:** gold/silver/ratio can be hidden via an Edit
+  mode toggle (shows a hide/show control on every row instead of a
+  permanently visible one). Hidden items can be brought back the same
+  way, shown dimmed while in Edit mode.
+- **Currency display:** Settings toggle, INR (default) or native
+  currency. Only USD-priced items convert (via the live USD-INR rate);
+  other currencies pass through untouched — no reliable rate fetched
+  for them, so no fake conversion is offered. Applies consistently to
+  list rows, the detail header, the stats grid, and the chart's own
+  y-axis (chart points get the same scalar multiply, so the curve's
+  shape never changes, only its labeled scale).
 - **Refresh interval:** default 15s. Configurable in settings, 5s up to
-  5min. Manual refresh button always available regardless of interval.
-  5s as a sustained default was considered and rejected — free
-  unofficial endpoint, real risk of IP throttling once the watchlist
-  has more than a few symbols. UI should surface a clear "requests
-  failing, try a longer interval" hint rather than failing silently.
-- **Watchlist:** starts empty. Gold/silver cards are fixed, not part of
-  the watchlist.
+  5min, via a custom-built dropdown (native `<select>` renders with
+  unstyled OS-default popups on Linux/WebKitGTK — not fixable with
+  CSS on the parts that matter, so it's a hand-built dropdown instead).
+  Manual refresh button always available regardless of interval.
 - **Window close (X button):** minimizes rather than quits — stays in
   taskbar, clickable to restore. Tray icon is the secondary way in;
-  "Quit" only exists in the tray context menu.
+  "Quit" only exists in the tray context menu. A configurable global
+  keyboard shortcut (Settings, recorded live, needs at least one
+  modifier key) also toggles show/hide, works even when unfocused, via
+  `tauri-plugin-global-shortcut`.
 - **Charts:** range toggle 1D/1W/1M/6M/1Y/5Y for Yahoo-sourced symbols.
   Mutual funds skip 1D/1W — NAV is daily-only, intraday ranges are
   meaningless for them.
 - **Installer:** `tauri build` produces an NSIS installer with Start
   Menu + Desktop shortcut options, and registers autostart via
-  `tauri-plugin-autostart`. Must be built on Windows — not attempted
-  from this sandbox.
+  `tauri-plugin-autostart` (off by default, opt-in in Settings). Must
+  be built on Windows — CI (`.github/workflows/release.yml`) handles
+  this on a real `windows-latest` runner, not attempted locally.
 
 ## Open items
 
-- Confirm final icon/branding before first `tauri build`.
-- Decide whether autostart should default on after first successful
-  build+install, or stay off until the user opts in via settings.
+- Confirm final icon/branding — still the placeholder gold/silver coin
+  mark generated early on.
+- ~~Decide whether autostart should default on~~ — resolved: stays
+  opt-in, never auto-enabled by an installer.
+- **Desktop widget idea (raised, not scoped):** a separate always-on-top
+  floating window, positionable anywhere on the desktop, showing a
+  user-chosen subset of the watchlist. Technically straightforward in
+  Tauri (multi-window is native support, a second undecorated
+  transparent window is a normal pattern) — not started, needs actual
+  scoping first: what it shows, whether it persists position/size,
+  whether it needs to work independent of the main window being open
+  at all.
