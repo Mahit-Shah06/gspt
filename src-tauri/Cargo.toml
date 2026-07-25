@@ -1,7 +1,7 @@
 [package]
-name = "gspt"
+name = "rapt"
 version = "0.1.0"
-description = "Gold-Silver Price Tracker"
+description = "Real-time Asset Price Tracker"
 edition = "2021"
 
 [build-dependencies]

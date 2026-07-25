@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "GSPT",
+  "productName": "RAPT",
   "version": "0.1.0",
-  "identifier": "com.raj.gspt",
+  "identifier": "com.raj.rapt",
   "build": {
     "frontendDist": "../src"
   },
@@ -11,7 +11,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "GSPT — Gold-Silver Price Tracker",
+        "title": "RAPT — Real-time Asset Price Tracker",
         "width": 1180,
         "height": 780,
         "minWidth": 860,

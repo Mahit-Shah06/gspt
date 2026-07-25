@@ -1,8 +1,8 @@
 {
-  "name": "gspt",
+  "name": "rapt",
   "version": "0.1.0",
   "private": true,
-  "description": "Gold-Silver Price Tracker",
+  "description": "Real-time Asset Price Tracker",
   "scripts": {
     "tauri": "tauri"
   },

@@ -19,7 +19,7 @@ fn main() {
             None,
         ))
         .setup(|app| {
-            let show_item = MenuItem::with_id(app, "show", "Show GSPT", true, None::<&str>)?;
+            let show_item = MenuItem::with_id(app, "show", "Show RAPT", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
 
@@ -31,7 +31,7 @@ fn main() {
             TrayIconBuilder::new()
                 .icon(icon)
                 .menu(&menu)
-                .tooltip("GSPT — Gold-Silver Price Tracker")
+                .tooltip("RAPT — Real-time Asset Price Tracker")
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => restore_main_window(app),
                     "quit" => app.exit(0),
@@ -67,7 +67,7 @@ fn main() {
             commands::autostart_set,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running GSPT");
+        .expect("error while running RAPT");
 }
 
 fn restore_main_window(app: &tauri::AppHandle) {

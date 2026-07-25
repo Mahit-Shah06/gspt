@@ -1,4 +1,4 @@
-# GSPT — Gold-Silver Price Tracker
+# RAPT — Real-time Asset Price Tracker
 
 Desktop app (Windows). Live gold/silver price, plus a watchlist for any
 stock, ETF, or mutual fund (India + US), with charts. Runs at startup,

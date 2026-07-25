@@ -29,7 +29,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: "GSPT ${{ github.ref_name }}"
+          releaseName: "RAPT ${{ github.ref_name }}"
           releaseBody: "Windows installer below. Unsigned build — Windows SmartScreen will show an 'unknown publisher' warning on first run, that's expected for an app without a paid code-signing certificate. Click 'More info' -> 'Run anyway'."
           releaseDraft: true
           prerelease: false
