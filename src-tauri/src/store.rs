@@ -14,15 +14,17 @@ pub struct WatchlistItem {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", default)]
 pub struct Settings {
     pub refresh_interval_secs: u64,
+    pub hidden_metals: Vec<String>,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Settings {
             refresh_interval_secs: 15,
+            hidden_metals: Vec::new(),
         }
     }
 }

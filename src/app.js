@@ -26,16 +26,16 @@ const METALS = [
 
 const state = {
   watchlist: [],
-  quotes: {},      // id -> { price, change, changePercent, currency, error } — also holds "gold"/"silver"
+  quotes: {},       // id -> { price, change, changePercent, currency, error, ...statsFields } — also holds "gold"/"silver"
   usdInr: null,
-  mfCache: {},      // schemeCode -> full MfData
-  settings: { refreshIntervalSecs: 15 },
+  mfCache: {},       // schemeCode -> full MfData
+  settings: { refreshIntervalSecs: 15, hiddenMetals: [] },
   refreshTimer: null,
   activeItemId: null,
   activeRangeKey: null,
   chart: null,
-  addMode: "yahoo",
-  mfSearchDebounce: null
+  editMode: false,
+  searchDebounce: null
 };
 
 // ---------- formatting ----------
@@ -72,7 +72,7 @@ async function init() {
   } catch (e) {
     console.error("settings_get failed", e);
   }
-  document.getElementById("intervalSelect").value = String(state.settings.refreshIntervalSecs);
+  if (!state.settings.hiddenMetals) state.settings.hiddenMetals = [];
 
   try {
     state.watchlist = await invoke("watchlist_get");
@@ -87,6 +87,7 @@ async function init() {
     console.error("autostart_get failed", e);
   }
 
+  syncIntervalDropdownUI();
   renderList();
   wireStaticEvents();
 
@@ -133,22 +134,24 @@ function metalInrText(metal) {
   return `\u2248 ${formatMoney(value, "INR")} / ${metal.inrUnitLabel}`;
 }
 
-// ---------- watchlist ----------
+// ---------- list rendering ----------
 
 function renderList() {
   const body = document.getElementById("watchlistBody");
   body.innerHTML = "";
 
+  let anyMetalVisible = false;
   for (const metal of METALS) {
-    body.appendChild(buildMetalRow(metal));
+    const row = buildMetalRow(metal);
+    if (row) { body.appendChild(row); anyMetalVisible = true; }
   }
-
-  body.appendChild(buildAddRow());
 
   if (state.watchlist.length === 0) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.innerHTML = `<p class="empty-sub">Nothing else yet — add a stock, ETF, or mutual fund above.</p>`;
+    empty.innerHTML = anyMetalVisible
+      ? `<p class="empty-sub">Nothing else yet — search above to add a stock, ETF, or mutual fund.</p>`
+      : `<p class="empty-sub">List's empty. Search above to add something, or hit Edit to bring Gold/Silver back.</p>`;
     body.appendChild(empty);
     return;
   }
@@ -159,8 +162,11 @@ function renderList() {
 }
 
 function buildMetalRow(metal) {
+  const hidden = state.settings.hiddenMetals.includes(metal.id);
+  if (hidden && !state.editMode) return null;
+
   const row = document.createElement("div");
-  row.className = "watch-row" + (state.activeItemId === metal.id ? " active" : "");
+  row.className = "watch-row" + (state.activeItemId === metal.id ? " active" : "") + (hidden ? " row-hidden" : "");
 
   const q = state.quotes[metal.id];
   let priceText = "\u2014", changeText = "\u2014", changeCls = "flat";
@@ -181,22 +187,26 @@ function buildMetalRow(metal) {
       <span class="s">${escapeHtml(sub)}</span>
     </div>
     <span class="wr-price">${priceText}</span>
-    <span class="wr-change ${changeCls}">${changeText}</span>
+    <span class="wr-change-pill ${changeCls}">${changeText}</span>
     <span></span>
   `;
 
-  row.addEventListener("click", () => {
-    openChartFor({ id: metal.id, kind: "metal", symbol: metal.symbol, label: metal.label, sub: metal.sub });
-  });
+  if (state.editMode) {
+    const btn = document.createElement("button");
+    btn.className = "wr-remove";
+    btn.textContent = hidden ? "+" : "\u00d7";
+    btn.title = hidden ? "Show in list" : "Hide from list";
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleMetalHidden(metal.id);
+    });
+    row.lastElementChild.replaceWith(btn);
+  } else {
+    row.addEventListener("click", () => {
+      openChartFor({ id: metal.id, kind: "metal", symbol: metal.symbol, label: metal.label, sub: metal.sub });
+    });
+  }
 
-  return row;
-}
-
-function buildAddRow() {
-  const row = document.createElement("div");
-  row.className = "add-row";
-  row.innerHTML = `<span class="add-row-icon">+</span> Add stock, ETF, or mutual fund`;
-  row.addEventListener("click", openAddModal);
   return row;
 }
 
@@ -206,13 +216,13 @@ function buildWatchRow(item) {
   row.dataset.id = item.id;
 
   const q = state.quotes[item.id];
-  let priceText = "\u2014", changeHtml = "\u2014", changeCls = "flat";
+  let priceText = "\u2014", changeText = "\u2014", changeCls = "flat";
   if (q && q.error) {
     priceText = "err";
   } else if (q) {
     priceText = formatMoney(q.price, q.currency);
     const ch = formatChange(q.change, q.changePercent);
-    changeHtml = ch.text;
+    changeText = ch.text;
     changeCls = ch.cls;
   }
 
@@ -222,24 +232,41 @@ function buildWatchRow(item) {
       <span class="s">${escapeHtml(item.sub)}</span>
     </div>
     <span class="wr-price">${priceText}</span>
-    <span class="wr-change ${changeCls}">${changeHtml}</span>
-    <button class="wr-remove" title="Remove">&times;</button>
+    <span class="wr-change-pill ${changeCls}">${changeText}</span>
+    <span></span>
   `;
 
-  row.addEventListener("click", (e) => {
-    if (e.target.closest(".wr-remove")) return;
-    openChartFor(item);
-  });
-  row.querySelector(".wr-remove").addEventListener("click", async (e) => {
-    e.stopPropagation();
-    state.watchlist = state.watchlist.filter((w) => w.id !== item.id);
-    delete state.quotes[item.id];
-    await invoke("watchlist_save", { items: state.watchlist });
-    if (state.activeItemId === item.id) closeChart();
-    renderList();
-  });
+  if (state.editMode) {
+    const btn = document.createElement("button");
+    btn.className = "wr-remove";
+    btn.textContent = "\u00d7";
+    btn.title = "Remove";
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      state.watchlist = state.watchlist.filter((w) => w.id !== item.id);
+      delete state.quotes[item.id];
+      await invoke("watchlist_save", { items: state.watchlist });
+      if (state.activeItemId === item.id) closeChart();
+      renderList();
+    });
+    row.lastElementChild.replaceWith(btn);
+  } else {
+    row.addEventListener("click", () => openChartFor(item));
+  }
 
   return row;
+}
+
+async function toggleMetalHidden(id) {
+  const list = state.settings.hiddenMetals;
+  const idx = list.indexOf(id);
+  if (idx === -1) list.push(id); else list.splice(idx, 1);
+  try {
+    await invoke("settings_save", { settings: state.settings });
+  } catch (err) {
+    console.error("settings_save failed", err);
+  }
+  renderList();
 }
 
 async function refreshWatchlistQuotes(includeMf) {
@@ -268,12 +295,17 @@ async function refreshWatchlistQuotes(includeMf) {
   if (state.activeItemId) refreshActiveChartHeader();
 }
 
-// ---------- chart ----------
+// ---------- detail overlay ----------
+
+function findActiveItem() {
+  const metal = METALS.find((m) => m.id === state.activeItemId);
+  if (metal) return { id: metal.id, kind: "metal", symbol: metal.symbol, label: metal.label, sub: metal.sub };
+  return state.watchlist.find((w) => w.id === state.activeItemId);
+}
 
 function openChartFor(item) {
   state.activeItemId = item.id;
-  document.getElementById("chartPlaceholder").hidden = true;
-  document.getElementById("chartActive").hidden = false;
+  document.getElementById("detailModalBackdrop").hidden = false;
   document.getElementById("chartTitle").textContent = item.label;
   document.getElementById("chartSub").textContent = item.sub;
 
@@ -301,33 +333,66 @@ function openChartFor(item) {
   renderList();
 }
 
-function findActiveItem() {
-  const metal = METALS.find((m) => m.id === state.activeItemId);
-  if (metal) return { id: metal.id, kind: "metal", symbol: metal.symbol, label: metal.label, sub: metal.sub };
-  return state.watchlist.find((w) => w.id === state.activeItemId);
-}
-
 function refreshActiveChartHeader() {
   const item = findActiveItem();
   if (!item) return;
   const q = state.quotes[item.id];
   const priceEl = document.getElementById("chartPrice");
   const changeEl = document.getElementById("chartChange");
+
   if (!q || q.error) {
     priceEl.textContent = "\u2014";
     changeEl.textContent = "";
+  } else {
+    priceEl.textContent = formatMoney(q.price, q.currency || "USD");
+    const ch = formatChange(q.change, q.changePercent);
+    changeEl.textContent = ch.text;
+    changeEl.className = "chart-change " + ch.cls;
+
+    if (item.kind === "metal") {
+      const metal = METALS.find((m) => m.id === item.id);
+      const inrText = metalInrText(metal);
+      document.getElementById("chartSub").textContent = item.sub + (inrText ? ` \u00b7 ${inrText}` : "");
+    }
+  }
+
+  buildStatsGrid(item);
+}
+
+function buildStatsGrid(item) {
+  const grid = document.getElementById("statsGrid");
+  grid.innerHTML = "";
+
+  const addStat = (label, value) => {
+    if (value == null || value === "") return;
+    const div = document.createElement("div");
+    div.className = "stat-item";
+    div.innerHTML = `<span class="stat-label">${escapeHtml(label)}</span><span class="stat-value">${value}</span>`;
+    grid.appendChild(div);
+  };
+
+  if (item.kind === "mf_in") {
+    const data = state.mfCache[item.symbol];
+    if (data) {
+      addStat("Latest NAV Date", data.latestDate);
+      addStat("Category", "Mutual Fund (India)");
+    }
     return;
   }
-  priceEl.textContent = formatMoney(q.price, q.currency || "USD");
-  const ch = formatChange(q.change, q.changePercent);
-  changeEl.textContent = ch.text;
-  changeEl.className = "chart-change " + ch.cls;
 
-  if (item.kind === "metal") {
-    const metal = METALS.find((m) => m.id === item.id);
-    const inrText = metalInrText(metal);
-    document.getElementById("chartSub").textContent = item.sub + (inrText ? ` \u00b7 ${inrText}` : "");
+  const q = state.quotes[item.id];
+  if (!q || q.error) return;
+
+  addStat("Exchange", q.exchangeName ? escapeHtml(q.exchangeName) : null);
+  addStat("Open", q.open != null ? formatMoney(q.open, q.currency) : null);
+  if (q.dayLow != null && q.dayHigh != null) {
+    addStat("Day Range", `${formatMoney(q.dayLow, q.currency)} \u2013 ${formatMoney(q.dayHigh, q.currency)}`);
   }
+  if (q.fiftyTwoWeekLow != null && q.fiftyTwoWeekHigh != null) {
+    addStat("52W Range", `${formatMoney(q.fiftyTwoWeekLow, q.currency)} \u2013 ${formatMoney(q.fiftyTwoWeekHigh, q.currency)}`);
+  }
+  addStat("Prev Close", q.prevClose != null ? formatMoney(q.prevClose, q.currency) : null);
+  if (q.volume != null) addStat("Volume", Math.round(q.volume).toLocaleString("en-IN"));
 }
 
 let chartRequestId = 0;
@@ -357,7 +422,7 @@ async function loadChartData(item) {
       const hist = await invoke("get_history", { symbol: item.symbol, range: rangeDef.range, interval: rangeDef.interval });
       points = hist.points;
     }
-    if (requestId !== chartRequestId) return; // a newer request superseded this one — drop stale result
+    if (requestId !== chartRequestId) return;
     renderChart(points);
   } catch (err) {
     if (requestId !== chartRequestId) return;
@@ -374,10 +439,6 @@ async function loadChartData(item) {
 
 function renderChart(points) {
   const canvas = document.getElementById("priceChart");
-  // Ask Chart.js's own registry, not just our local variable — if state.chart
-  // ever gets out of sync with what's actually attached to the canvas (e.g.
-  // an out-of-order async response), this is what actually prevents the
-  // "canvas already in use" crash instead of just usually avoiding it.
   const existing = Chart.getChart(canvas);
   if (existing) existing.destroy();
 
@@ -420,124 +481,107 @@ function renderChart(points) {
 
 function closeChart() {
   state.activeItemId = null;
-  if (state.chart) { state.chart.destroy(); state.chart = null; }
-  document.getElementById("chartActive").hidden = true;
-  document.getElementById("chartPlaceholder").hidden = false;
+  const existing = Chart.getChart(document.getElementById("priceChart"));
+  if (existing) existing.destroy();
+  state.chart = null;
+  document.getElementById("detailModalBackdrop").hidden = true;
   renderList();
 }
 
-// ---------- add modal ----------
+// ---------- search-to-add ----------
 
-function openAddModal() {
-  document.getElementById("addModalBackdrop").hidden = false;
-  document.getElementById("tickerInput").value = "";
-  document.getElementById("tickerError").textContent = "";
-  document.getElementById("mfSearchInput").value = "";
-  document.getElementById("mfResults").innerHTML = "";
-  document.getElementById("mfError").textContent = "";
+function wireSearch() {
+  const input = document.getElementById("searchInput");
+  const resultsEl = document.getElementById("searchResults");
+
+  input.addEventListener("input", () => {
+    clearTimeout(state.searchDebounce);
+    const query = input.value.trim();
+    if (query.length < 2) { resultsEl.hidden = true; resultsEl.innerHTML = ""; return; }
+    state.searchDebounce = setTimeout(() => runSearch(query), 350);
+  });
+
+  input.addEventListener("focus", () => {
+    if (resultsEl.innerHTML.trim() !== "") resultsEl.hidden = false;
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".search-wrap")) resultsEl.hidden = true;
+  });
 }
 
-function closeAddModal() {
-  document.getElementById("addModalBackdrop").hidden = true;
+async function runSearch(query) {
+  const resultsEl = document.getElementById("searchResults");
+  resultsEl.hidden = false;
+  resultsEl.innerHTML = `<div class="search-status">Searching&hellip;</div>`;
+
+  const [marketRes, mfRes] = await Promise.allSettled([
+    invoke("market_search", { query }),
+    invoke("mf_search", { query })
+  ]);
+
+  const items = [];
+  if (marketRes.status === "fulfilled") {
+    for (const r of marketRes.value.slice(0, 8)) {
+      items.push({ kind: "yahoo", symbol: r.symbol, label: r.name, sub: [r.exchange, r.quoteType].filter(Boolean).join(" \u00b7 ") });
+    }
+  }
+  if (mfRes.status === "fulfilled") {
+    for (const r of mfRes.value.slice(0, 8)) {
+      items.push({ kind: "mf_in", symbol: String(r.schemeCode), label: r.schemeName, sub: "Mutual Fund (India)" });
+    }
+  }
+
+  if (items.length === 0) {
+    resultsEl.innerHTML = `<div class="search-status">No matches.</div>`;
+    return;
+  }
+
+  resultsEl.innerHTML = "";
+  for (const item of items) {
+    const row = document.createElement("div");
+    row.className = "search-result-row";
+    row.innerHTML = `
+      <button class="search-add-btn" title="Add">+</button>
+      <div class="sr-text">
+        <span class="sr-name">${escapeHtml(item.label)}</span>
+        <span class="sr-sub">${escapeHtml(item.sub)}</span>
+      </div>
+    `;
+    const btn = row.querySelector(".search-add-btn");
+    btn.addEventListener("click", () => addFromSearch(item, btn));
+    resultsEl.appendChild(row);
+  }
 }
 
-function setAddMode(mode) {
-  state.addMode = mode;
-  document.querySelectorAll(".modal-tab").forEach((t) => t.classList.toggle("active", t.dataset.mode === mode));
-  document.getElementById("modeYahoo").hidden = mode !== "yahoo";
-  document.getElementById("modeMfIn").hidden = mode !== "mf_in";
-}
-
-async function addTicker() {
-  const input = document.getElementById("tickerInput");
-  const errEl = document.getElementById("tickerError");
-  const symbol = input.value.trim().toUpperCase();
-  errEl.textContent = "";
-  if (!symbol) { errEl.textContent = "Enter a ticker symbol."; return; }
-
-  const btn = document.getElementById("addTickerBtn");
+async function addFromSearch(item, btn) {
   btn.disabled = true;
   try {
-    const q = await invoke("get_quote", { symbol });
-    if (q.price == null) throw new Error("No price data for this symbol");
-
-    const item = {
-      id: crypto.randomUUID(),
-      kind: "yahoo",
-      symbol,
-      label: symbol,
-      sub: [q.exchangeName, q.instrumentType].filter(Boolean).join(" \u00b7 ") || (q.currency || "")
-    };
-    state.watchlist.push(item);
-    state.quotes[item.id] = q;
+    if (state.watchlist.some((w) => w.kind === item.kind && w.symbol === item.symbol)) {
+      // already tracked, nothing to do
+    } else if (item.kind === "yahoo") {
+      const q = await invoke("get_quote", { symbol: item.symbol });
+      const watchItem = { id: crypto.randomUUID(), kind: "yahoo", symbol: item.symbol, label: item.label, sub: item.sub || q.exchangeName || "" };
+      state.watchlist.push(watchItem);
+      state.quotes[watchItem.id] = q;
+    } else {
+      const data = await invoke("mf_data", { schemeCode: item.symbol });
+      state.mfCache[item.symbol] = data;
+      const watchItem = { id: crypto.randomUUID(), kind: "mf_in", symbol: item.symbol, label: item.label, sub: "Mutual Fund (India)" };
+      state.watchlist.push(watchItem);
+      state.quotes[watchItem.id] = { price: data.latestNav, change: data.change, changePercent: data.changePercent, currency: "INR" };
+    }
     await invoke("watchlist_save", { items: state.watchlist });
     renderList();
-    closeAddModal();
+    document.getElementById("searchInput").value = "";
+    document.getElementById("searchResults").hidden = true;
   } catch (err) {
-    errEl.textContent = "Could not add: " + String(err).slice(0, 120);
-  } finally {
+    console.error("add from search failed", err);
     btn.disabled = false;
   }
 }
 
-function wireMfSearch() {
-  const input = document.getElementById("mfSearchInput");
-  input.addEventListener("input", () => {
-    clearTimeout(state.mfSearchDebounce);
-    const query = input.value.trim();
-    const resultsEl = document.getElementById("mfResults");
-    const errEl = document.getElementById("mfError");
-    errEl.textContent = "";
-    if (query.length < 3) { resultsEl.innerHTML = ""; return; }
-
-    state.mfSearchDebounce = setTimeout(async () => {
-      try {
-        const results = await invoke("mf_search", { query });
-        resultsEl.innerHTML = "";
-        for (const r of results.slice(0, 25)) {
-          const div = document.createElement("div");
-          div.className = "mf-result-item";
-          div.innerHTML = `${escapeHtml(r.schemeName)}<br><span class="code">${escapeHtml(String(r.schemeCode))}</span>`;
-          div.addEventListener("click", () => addMfItem(r.schemeCode, r.schemeName));
-          resultsEl.appendChild(div);
-        }
-        if (results.length === 0) errEl.textContent = "No funds matched.";
-      } catch (err) {
-        errEl.textContent = "Search failed: " + String(err).slice(0, 120);
-      }
-    }, 400);
-  });
-}
-
-async function addMfItem(schemeCode, schemeName) {
-  const errEl = document.getElementById("mfError");
-  try {
-    const data = await invoke("mf_data", { schemeCode: String(schemeCode) });
-    state.mfCache[String(schemeCode)] = data;
-
-    const item = {
-      id: crypto.randomUUID(),
-      kind: "mf_in",
-      symbol: String(schemeCode),
-      label: schemeName,
-      sub: "Mutual Fund (India)"
-    };
-    state.watchlist.push(item);
-    state.quotes[item.id] = {
-      price: data.latestNav,
-      change: data.change,
-      changePercent: data.changePercent,
-      currency: "INR"
-    };
-    await invoke("watchlist_save", { items: state.watchlist });
-    renderList();
-    closeAddModal();
-  } catch (err) {
-    errEl.textContent = "Could not add: " + String(err).slice(0, 120);
-  }
-}
-
-// ---------- settings modal ----------
+// ---------- settings ----------
 
 function openSettingsModal() {
   document.getElementById("settingsModalBackdrop").hidden = false;
@@ -545,6 +589,44 @@ function openSettingsModal() {
 }
 function closeSettingsModal() {
   document.getElementById("settingsModalBackdrop").hidden = true;
+}
+
+function syncIntervalDropdownUI() {
+  const label = document.getElementById("intervalTriggerLabel");
+  const menu = document.getElementById("intervalMenu");
+  const match = menu.querySelector(`.dropdown-item[data-value="${state.settings.refreshIntervalSecs}"]`);
+  menu.querySelectorAll(".dropdown-item").forEach((i) => i.classList.remove("selected"));
+  if (match) {
+    label.textContent = match.textContent;
+    match.classList.add("selected");
+  } else {
+    label.textContent = `${state.settings.refreshIntervalSecs} seconds`;
+  }
+}
+
+function wireIntervalDropdown() {
+  const trigger = document.getElementById("intervalTrigger");
+  const menu = document.getElementById("intervalMenu");
+
+  trigger.addEventListener("click", () => { menu.hidden = !menu.hidden; });
+
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("#intervalDropdown")) menu.hidden = true;
+  });
+
+  menu.querySelectorAll(".dropdown-item").forEach((item) => {
+    item.addEventListener("click", async () => {
+      state.settings.refreshIntervalSecs = parseInt(item.dataset.value, 10);
+      syncIntervalDropdownUI();
+      menu.hidden = true;
+      try {
+        await invoke("settings_save", { settings: state.settings });
+        startRefreshLoop();
+      } catch (err) {
+        document.getElementById("settingsError").textContent = "Could not save: " + String(err).slice(0, 120);
+      }
+    });
+  });
 }
 
 // ---------- wiring ----------
@@ -557,20 +639,19 @@ function wireStaticEvents() {
     setTimeout(() => e.currentTarget.classList.remove("spinning"), 600);
   });
 
-  document.getElementById("closeAddBtn").addEventListener("click", closeAddModal);
-  document.getElementById("addModalBackdrop").addEventListener("click", (e) => {
-    if (e.target.id === "addModalBackdrop") closeAddModal();
+  document.getElementById("editToggleBtn").addEventListener("click", (e) => {
+    state.editMode = !state.editMode;
+    e.currentTarget.classList.toggle("active", state.editMode);
+    e.currentTarget.textContent = state.editMode ? "Done" : "Edit";
+    renderList();
   });
-  document.querySelectorAll(".modal-tab").forEach((tab) => {
-    tab.addEventListener("click", () => setAddMode(tab.dataset.mode));
-  });
-  document.getElementById("addTickerBtn").addEventListener("click", addTicker);
-  document.getElementById("tickerInput").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") addTicker();
-  });
-  wireMfSearch();
+
+  wireSearch();
 
   document.getElementById("closeChartBtn").addEventListener("click", closeChart);
+  document.getElementById("detailModalBackdrop").addEventListener("click", (e) => {
+    if (e.target.id === "detailModalBackdrop") closeChart();
+  });
 
   document.getElementById("settingsBtn").addEventListener("click", openSettingsModal);
   document.getElementById("closeSettingsBtn").addEventListener("click", closeSettingsModal);
@@ -578,16 +659,7 @@ function wireStaticEvents() {
     if (e.target.id === "settingsModalBackdrop") closeSettingsModal();
   });
 
-  document.getElementById("intervalSelect").addEventListener("change", async (e) => {
-    const secs = parseInt(e.target.value, 10);
-    state.settings.refreshIntervalSecs = secs;
-    try {
-      await invoke("settings_save", { settings: state.settings });
-      startRefreshLoop();
-    } catch (err) {
-      document.getElementById("settingsError").textContent = "Could not save: " + String(err).slice(0, 120);
-    }
-  });
+  wireIntervalDropdown();
 
   document.getElementById("startupToggle").addEventListener("change", async (e) => {
     const enabled = e.target.checked;

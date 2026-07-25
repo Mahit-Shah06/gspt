@@ -16,6 +16,12 @@ pub struct Quote {
     pub exchange_name: Option<String>,
     pub instrument_type: Option<String>,
     pub market_state: Option<String>,
+    pub day_high: Option<f64>,
+    pub day_low: Option<f64>,
+    pub fifty_two_week_high: Option<f64>,
+    pub fifty_two_week_low: Option<f64>,
+    pub open: Option<f64>,
+    pub volume: Option<f64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -121,6 +127,12 @@ fn parse_quote(result: &Value) -> Quote {
             .get("marketState")
             .and_then(|v| v.as_str())
             .map(String::from),
+        day_high: meta.get("regularMarketDayHigh").and_then(|v| v.as_f64()),
+        day_low: meta.get("regularMarketDayLow").and_then(|v| v.as_f64()),
+        fifty_two_week_high: meta.get("fiftyTwoWeekHigh").and_then(|v| v.as_f64()),
+        fifty_two_week_low: meta.get("fiftyTwoWeekLow").and_then(|v| v.as_f64()),
+        open: meta.get("regularMarketOpen").and_then(|v| v.as_f64()),
+        volume: meta.get("regularMarketVolume").and_then(|v| v.as_f64()),
     }
 }
 
@@ -160,4 +172,66 @@ pub async fn get_history(symbol: &str, range: &str, interval: &str) -> Result<Hi
         quote: parse_quote(&result),
         points: parse_history(&result),
     })
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchResult {
+    pub symbol: String,
+    pub name: String,
+    pub exchange: Option<String>,
+    pub quote_type: Option<String>,
+}
+
+fn encode_query(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
+            ' ' => "%20".to_string(),
+            other => format!("%{:02X}", other as u32),
+        })
+        .collect()
+}
+
+pub async fn search_symbols(query: &str) -> Result<Vec<SearchResult>, String> {
+    let url = format!(
+        "https://query2.finance.yahoo.com/v1/finance/search?q={}&quotesCount=10&newsCount=0",
+        encode_query(query)
+    );
+    let client = reqwest::Client::new();
+    let res = client
+        .get(&url)
+        .header("User-Agent", USER_AGENT)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !res.status().is_success() {
+        return Err(format!("Symbol search failed ({})", res.status()));
+    }
+
+    let json: Value = res.json().await.map_err(|e| e.to_string())?;
+    let quotes = json
+        .get("quotes")
+        .and_then(|q| q.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    let results = quotes
+        .into_iter()
+        .filter_map(|q| {
+            let symbol = q.get("symbol")?.as_str()?.to_string();
+            let name = q
+                .get("longname")
+                .and_then(|v| v.as_str())
+                .or_else(|| q.get("shortname").and_then(|v| v.as_str()))
+                .unwrap_or(&symbol)
+                .to_string();
+            let exchange = q.get("exchange").and_then(|v| v.as_str()).map(String::from);
+            let quote_type = q.get("quoteType").and_then(|v| v.as_str()).map(String::from);
+            Some(SearchResult { symbol, name, exchange, quote_type })
+        })
+        .collect();
+
+    Ok(results)
 }

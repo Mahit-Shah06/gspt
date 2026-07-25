@@ -56,6 +56,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_quote,
+            commands::market_search,
             commands::get_history,
             commands::mf_search,
             commands::mf_data,

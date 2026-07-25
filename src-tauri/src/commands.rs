@@ -11,6 +11,11 @@ pub async fn get_quote(symbol: String) -> Result<Quote, String> {
 }
 
 #[tauri::command]
+pub async fn market_search(query: String) -> Result<Vec<market::SearchResult>, String> {
+    market::search_symbols(&query).await
+}
+
+#[tauri::command]
 pub async fn get_history(symbol: String, range: String, interval: String) -> Result<History, String> {
     market::get_history(&symbol, &range, &interval).await
 }

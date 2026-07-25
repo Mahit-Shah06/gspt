@@ -21,76 +21,52 @@
       </div>
     </header>
 
-    <main class="main-grid">
+    <main class="list-page">
 
       <section class="watchlist-panel">
         <div class="panel-head">
           <h2>Watchlist</h2>
+          <button class="edit-toggle" id="editToggleBtn">Edit</button>
         </div>
         <p class="list-note">Gold/Silver INR figures are spot-converted — not your local jeweler/MCX rate.</p>
+
+        <div class="search-wrap">
+          <span class="search-icon">&#128269;</span>
+          <input type="text" id="searchInput" class="search-input" placeholder="Search stocks, ETFs, mutual funds&hellip;" autocomplete="off" />
+          <div class="search-results" id="searchResults" hidden></div>
+        </div>
 
         <div class="table-head">
           <span class="col-name">Name</span>
           <span class="col-price">Price</span>
-          <span class="col-change">Change</span>
+          <span class="col-change">24h Change</span>
           <span></span>
         </div>
 
         <div class="table-body" id="watchlistBody"></div>
       </section>
 
-      <section class="chart-panel" id="chartPanel">
-        <div class="chart-placeholder" id="chartPlaceholder">
-          <p>Select an item from your watchlist to see its chart.</p>
-        </div>
-        <div class="chart-active" id="chartActive" hidden>
-          <div class="chart-head">
-            <div>
-              <h3 id="chartTitle">&mdash;</h3>
-              <span class="chart-sub" id="chartSub">&mdash;</span>
-            </div>
-            <button class="icon-btn ghost" id="closeChartBtn" title="Close">&times;</button>
-          </div>
-          <div class="chart-price-row">
-            <span class="chart-price" id="chartPrice">&mdash;</span>
-            <span class="chart-change" id="chartChange">&mdash;</span>
-          </div>
-          <div class="range-tabs" id="rangeTabs"></div>
-          <div class="chart-canvas-wrap">
-            <canvas id="priceChart"></canvas>
-          </div>
-        </div>
-      </section>
-
     </main>
   </div>
 
-  <div class="modal-backdrop" id="addModalBackdrop" hidden>
-    <div class="modal">
-      <div class="modal-head">
-        <h3>Add to watchlist</h3>
-        <button class="icon-btn ghost" id="closeAddBtn">&times;</button>
+  <div class="modal-backdrop" id="detailModalBackdrop" hidden>
+    <div class="modal detail-modal">
+      <div class="chart-head">
+        <div>
+          <h3 id="chartTitle">&mdash;</h3>
+          <span class="chart-sub" id="chartSub">&mdash;</span>
+        </div>
+        <button class="icon-btn ghost" id="closeChartBtn" title="Close">&times;</button>
       </div>
-
-      <div class="modal-tabs">
-        <button class="modal-tab active" data-mode="yahoo">Stock / ETF / US Fund</button>
-        <button class="modal-tab" data-mode="mf_in">Indian Mutual Fund</button>
+      <div class="chart-price-row">
+        <span class="chart-price" id="chartPrice">&mdash;</span>
+        <span class="chart-change" id="chartChange">&mdash;</span>
       </div>
-
-      <div class="modal-body" id="modeYahoo">
-        <label class="field-label">Ticker symbol</label>
-        <input type="text" id="tickerInput" placeholder="e.g. AAPL, SPY, RELIANCE.NS, TCS.NS, GOLDBEES.NS" autocomplete="off" />
-        <p class="field-hint">US symbols need no suffix. NSE symbols end in .NS, BSE symbols end in .BO.</p>
-        <button class="primary-btn" id="addTickerBtn">Add</button>
-        <p class="field-error" id="tickerError"></p>
+      <div class="range-tabs" id="rangeTabs"></div>
+      <div class="chart-canvas-wrap">
+        <canvas id="priceChart"></canvas>
       </div>
-
-      <div class="modal-body" id="modeMfIn" hidden>
-        <label class="field-label">Search by fund name</label>
-        <input type="text" id="mfSearchInput" placeholder="e.g. Parag Parikh Flexi Cap" autocomplete="off" />
-        <div class="mf-results" id="mfResults"></div>
-        <p class="field-error" id="mfError"></p>
-      </div>
+      <div class="stats-grid" id="statsGrid"></div>
     </div>
   </div>
 
@@ -102,13 +78,19 @@
       </div>
 
       <label class="field-label">Refresh interval</label>
-      <select id="intervalSelect" class="select-input">
-        <option value="5">5 seconds</option>
-        <option value="15">15 seconds</option>
-        <option value="30">30 seconds</option>
-        <option value="60">1 minute</option>
-        <option value="300">5 minutes</option>
-      </select>
+      <div class="dropdown" id="intervalDropdown">
+        <button class="dropdown-trigger" id="intervalTrigger" type="button">
+          <span id="intervalTriggerLabel">15 seconds</span>
+          <span class="dropdown-caret">&#9662;</span>
+        </button>
+        <div class="dropdown-menu" id="intervalMenu" hidden>
+          <div class="dropdown-item" data-value="5">5 seconds</div>
+          <div class="dropdown-item" data-value="15">15 seconds</div>
+          <div class="dropdown-item" data-value="30">30 seconds</div>
+          <div class="dropdown-item" data-value="60">1 minute</div>
+          <div class="dropdown-item" data-value="300">5 minutes</div>
+        </div>
+      </div>
       <p class="field-hint">Shorter intervals hit a free, unofficial API harder. If quotes start failing, the manual refresh button still always works — try a longer interval here.</p>
 
       <label class="startup-toggle settings-toggle">
