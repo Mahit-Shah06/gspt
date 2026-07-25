@@ -19,9 +19,15 @@ const MF_RANGES = [
   { key: "all", label: "All", days: null }
 ];
 
+const METALS = [
+  { id: "gold", symbol: "GC=F", label: "Gold", sub: "COMEX spot", gramsPerUnit: 10, inrUnitLabel: "10g" },
+  { id: "silver", symbol: "SI=F", label: "Silver", sub: "COMEX spot", gramsPerUnit: 1000, inrUnitLabel: "kg" }
+];
+
 const state = {
   watchlist: [],
-  quotes: {},      // id -> { price, change, changePercent, currency, error }
+  quotes: {},      // id -> { price, change, changePercent, currency, error } — also holds "gold"/"silver"
+  usdInr: null,
   mfCache: {},      // schemeCode -> full MfData
   settings: { refreshIntervalSecs: 15 },
   refreshTimer: null,
@@ -81,7 +87,7 @@ async function init() {
     console.error("autostart_get failed", e);
   }
 
-  renderWatchlist();
+  renderList();
   wireStaticEvents();
 
   await Promise.all([fetchGoldSilver(), refreshWatchlistQuotes(true)]);
@@ -111,100 +117,129 @@ async function fetchGoldSilver() {
     invoke("get_quote", { symbol: "INR=X" })
   ]);
 
-  const usdInr = fx.status === "fulfilled" ? fx.value.price : null;
+  state.usdInr = fx.status === "fulfilled" ? fx.value.price : null;
+  state.quotes.gold = gold.status === "fulfilled" ? gold.value : { error: true };
+  state.quotes.silver = silver.status === "fulfilled" ? silver.value : { error: true };
 
-  renderMetal("gold", gold, usdInr);
-  renderMetal("silver", silver, usdInr);
+  renderList();
+  if (state.activeItemId === "gold" || state.activeItemId === "silver") refreshActiveChartHeader();
 }
 
-function renderMetal(kind, settledQuote, usdInr) {
-  const card = document.getElementById(kind === "gold" ? "goldCard" : "silverCard");
-  const dot = card.querySelector(".pulse-dot");
-  const readings = document.getElementById(kind === "gold" ? "goldReadings" : "silverReadings");
-
-  if (settledQuote.status !== "fulfilled") {
-    dot.classList.add("err");
-    readings.innerHTML = `<div class="reading"><span class="r-label">Error</span><span class="r-value" style="font-size:12px">${escapeHtml(String(settledQuote.reason).slice(0, 80))}</span></div>`;
-    return;
-  }
-  dot.classList.remove("err");
-
-  const q = settledQuote.value;
-  const usdOz = q.price;
-  const ch = formatChange(q.change, q.changePercent);
-  const inrLabel = kind === "gold" ? "INR / 10g" : "INR / kg";
-
-  let inrValue = "\u2014";
-  if (usdOz != null && usdInr != null) {
-    const perGram = usdOz / TROY_OZ_TO_GRAMS;
-    const gramsPerUnit = kind === "gold" ? 10 : 1000;
-    inrValue = formatMoney(perGram * usdInr * gramsPerUnit, "INR");
-  }
-
-  readings.innerHTML = `
-    <div class="reading">
-      <span class="r-label">USD / oz</span>
-      <span class="r-value">${formatMoney(usdOz, "USD")}</span>
-      <span class="r-change ${ch.cls}">${ch.text}</span>
-    </div>
-    <div class="reading">
-      <span class="r-label">${inrLabel}</span>
-      <span class="r-value">${inrValue}</span>
-    </div>
-  `;
+function metalInrText(metal) {
+  const q = state.quotes[metal.id];
+  if (!q || q.error || q.price == null || state.usdInr == null) return null;
+  const perGram = q.price / TROY_OZ_TO_GRAMS;
+  const value = perGram * state.usdInr * metal.gramsPerUnit;
+  return `\u2248 ${formatMoney(value, "INR")} / ${metal.inrUnitLabel}`;
 }
 
 // ---------- watchlist ----------
 
-function renderWatchlist() {
+function renderList() {
   const body = document.getElementById("watchlistBody");
+  body.innerHTML = "";
+
+  for (const metal of METALS) {
+    body.appendChild(buildMetalRow(metal));
+  }
+
+  body.appendChild(buildAddRow());
+
   if (state.watchlist.length === 0) {
-    body.innerHTML = `<div class="empty-state"><p>Nothing here yet.</p><p class="empty-sub">Add a stock, ETF, or mutual fund to start tracking it.</p></div>`;
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.innerHTML = `<p class="empty-sub">Nothing else yet — add a stock, ETF, or mutual fund above.</p>`;
+    body.appendChild(empty);
     return;
   }
 
-  body.innerHTML = "";
   for (const item of state.watchlist) {
-    const row = document.createElement("div");
-    row.className = "watch-row" + (item.id === state.activeItemId ? " active" : "");
-    row.dataset.id = item.id;
-
-    const q = state.quotes[item.id];
-    let priceText = "\u2014", changeHtml = "\u2014", changeCls = "flat";
-    if (q && q.error) {
-      priceText = "err";
-    } else if (q) {
-      priceText = formatMoney(q.price, q.currency);
-      const ch = formatChange(q.change, q.changePercent);
-      changeHtml = ch.text;
-      changeCls = ch.cls;
-    }
-
-    row.innerHTML = `
-      <div class="wr-name">
-        <span class="n">${escapeHtml(item.label)}</span>
-        <span class="s">${escapeHtml(item.sub)}</span>
-      </div>
-      <span class="wr-price">${priceText}</span>
-      <span class="wr-change ${changeCls}">${changeHtml}</span>
-      <button class="wr-remove" title="Remove">&times;</button>
-    `;
-
-    row.addEventListener("click", (e) => {
-      if (e.target.closest(".wr-remove")) return;
-      openChartFor(item);
-    });
-    row.querySelector(".wr-remove").addEventListener("click", async (e) => {
-      e.stopPropagation();
-      state.watchlist = state.watchlist.filter((w) => w.id !== item.id);
-      delete state.quotes[item.id];
-      await invoke("watchlist_save", { items: state.watchlist });
-      if (state.activeItemId === item.id) closeChart();
-      renderWatchlist();
-    });
-
-    body.appendChild(row);
+    body.appendChild(buildWatchRow(item));
   }
+}
+
+function buildMetalRow(metal) {
+  const row = document.createElement("div");
+  row.className = "watch-row" + (state.activeItemId === metal.id ? " active" : "");
+
+  const q = state.quotes[metal.id];
+  let priceText = "\u2014", changeText = "\u2014", changeCls = "flat";
+  if (q && q.error) {
+    priceText = "err";
+  } else if (q) {
+    priceText = formatMoney(q.price, "USD");
+    const ch = formatChange(q.change, q.changePercent);
+    changeText = ch.text;
+    changeCls = ch.cls;
+  }
+  const inrText = metalInrText(metal);
+  const sub = metal.sub + (inrText ? ` \u00b7 ${inrText}` : "");
+
+  row.innerHTML = `
+    <div class="wr-name">
+      <span class="n"><span class="dot ${metal.id}"></span>${metal.label}</span>
+      <span class="s">${escapeHtml(sub)}</span>
+    </div>
+    <span class="wr-price">${priceText}</span>
+    <span class="wr-change ${changeCls}">${changeText}</span>
+    <span></span>
+  `;
+
+  row.addEventListener("click", () => {
+    openChartFor({ id: metal.id, kind: "metal", symbol: metal.symbol, label: metal.label, sub: metal.sub });
+  });
+
+  return row;
+}
+
+function buildAddRow() {
+  const row = document.createElement("div");
+  row.className = "add-row";
+  row.innerHTML = `<span class="add-row-icon">+</span> Add stock, ETF, or mutual fund`;
+  row.addEventListener("click", openAddModal);
+  return row;
+}
+
+function buildWatchRow(item) {
+  const row = document.createElement("div");
+  row.className = "watch-row" + (item.id === state.activeItemId ? " active" : "");
+  row.dataset.id = item.id;
+
+  const q = state.quotes[item.id];
+  let priceText = "\u2014", changeHtml = "\u2014", changeCls = "flat";
+  if (q && q.error) {
+    priceText = "err";
+  } else if (q) {
+    priceText = formatMoney(q.price, q.currency);
+    const ch = formatChange(q.change, q.changePercent);
+    changeHtml = ch.text;
+    changeCls = ch.cls;
+  }
+
+  row.innerHTML = `
+    <div class="wr-name">
+      <span class="n">${escapeHtml(item.label)}</span>
+      <span class="s">${escapeHtml(item.sub)}</span>
+    </div>
+    <span class="wr-price">${priceText}</span>
+    <span class="wr-change ${changeCls}">${changeHtml}</span>
+    <button class="wr-remove" title="Remove">&times;</button>
+  `;
+
+  row.addEventListener("click", (e) => {
+    if (e.target.closest(".wr-remove")) return;
+    openChartFor(item);
+  });
+  row.querySelector(".wr-remove").addEventListener("click", async (e) => {
+    e.stopPropagation();
+    state.watchlist = state.watchlist.filter((w) => w.id !== item.id);
+    delete state.quotes[item.id];
+    await invoke("watchlist_save", { items: state.watchlist });
+    if (state.activeItemId === item.id) closeChart();
+    renderList();
+  });
+
+  return row;
 }
 
 async function refreshWatchlistQuotes(includeMf) {
@@ -229,7 +264,7 @@ async function refreshWatchlistQuotes(includeMf) {
     }
   });
   await Promise.all(tasks);
-  renderWatchlist();
+  renderList();
   if (state.activeItemId) refreshActiveChartHeader();
 }
 
@@ -263,11 +298,17 @@ function openChartFor(item) {
 
   refreshActiveChartHeader();
   loadChartData(item);
-  renderWatchlist();
+  renderList();
+}
+
+function findActiveItem() {
+  const metal = METALS.find((m) => m.id === state.activeItemId);
+  if (metal) return { id: metal.id, kind: "metal", symbol: metal.symbol, label: metal.label, sub: metal.sub };
+  return state.watchlist.find((w) => w.id === state.activeItemId);
 }
 
 function refreshActiveChartHeader() {
-  const item = state.watchlist.find((w) => w.id === state.activeItemId);
+  const item = findActiveItem();
   if (!item) return;
   const q = state.quotes[item.id];
   const priceEl = document.getElementById("chartPrice");
@@ -277,10 +318,16 @@ function refreshActiveChartHeader() {
     changeEl.textContent = "";
     return;
   }
-  priceEl.textContent = formatMoney(q.price, q.currency);
+  priceEl.textContent = formatMoney(q.price, q.currency || "USD");
   const ch = formatChange(q.change, q.changePercent);
   changeEl.textContent = ch.text;
   changeEl.className = "chart-change " + ch.cls;
+
+  if (item.kind === "metal") {
+    const metal = METALS.find((m) => m.id === item.id);
+    const inrText = metalInrText(metal);
+    document.getElementById("chartSub").textContent = item.sub + (inrText ? ` \u00b7 ${inrText}` : "");
+  }
 }
 
 async function loadChartData(item) {
@@ -364,7 +411,7 @@ function closeChart() {
   if (state.chart) { state.chart.destroy(); state.chart = null; }
   document.getElementById("chartActive").hidden = true;
   document.getElementById("chartPlaceholder").hidden = false;
-  renderWatchlist();
+  renderList();
 }
 
 // ---------- add modal ----------
@@ -412,7 +459,7 @@ async function addTicker() {
     state.watchlist.push(item);
     state.quotes[item.id] = q;
     await invoke("watchlist_save", { items: state.watchlist });
-    renderWatchlist();
+    renderList();
     closeAddModal();
   } catch (err) {
     errEl.textContent = "Could not add: " + String(err).slice(0, 120);
@@ -471,7 +518,7 @@ async function addMfItem(schemeCode, schemeName) {
       currency: "INR"
     };
     await invoke("watchlist_save", { items: state.watchlist });
-    renderWatchlist();
+    renderList();
     closeAddModal();
   } catch (err) {
     errEl.textContent = "Could not add: " + String(err).slice(0, 120);
@@ -498,7 +545,6 @@ function wireStaticEvents() {
     setTimeout(() => e.currentTarget.classList.remove("spinning"), 600);
   });
 
-  document.getElementById("openAddBtn").addEventListener("click", openAddModal);
   document.getElementById("closeAddBtn").addEventListener("click", closeAddModal);
   document.getElementById("addModalBackdrop").addEventListener("click", (e) => {
     if (e.target.id === "addModalBackdrop") closeAddModal();

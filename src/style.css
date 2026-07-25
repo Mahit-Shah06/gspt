@@ -99,59 +99,33 @@ button, input, select { font-family: inherit; }
 
 /* ---------- metals strip ---------- */
 
-.metals-strip {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  flex-shrink: 0;
-}
-
-.metals-note {
-  margin: -6px 0 0;
-  font-size: 10.5px;
+.list-note {
+  margin: -6px 16px 8px;
+  font-size: 10px;
   color: var(--text-faint);
   flex-shrink: 0;
 }
 
-.metal-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 14px 18px;
+.dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 7px; vertical-align: middle; }
+.dot.gold { background: var(--gold); }
+.dot.silver { background: var(--silver); }
+
+.add-row {
   display: flex;
   align-items: center;
-  gap: 16px;
-  position: relative;
-  overflow: hidden;
+  gap: 8px;
+  padding: 10px 12px;
+  margin: 2px 8px 10px;
+  border: 1px dashed var(--gold-dim);
+  border-radius: 8px;
+  color: var(--gold);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s;
 }
-
-.metal-card::before {
-  content: "";
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 3px;
-}
-.metal-card.gold::before { background: var(--gold); }
-.metal-card.silver::before { background: var(--silver); }
-
-.metal-label { display: flex; flex-direction: column; gap: 3px; min-width: 76px; }
-.metal-label .name { font-weight: 600; font-size: 13.5px; display: flex; align-items: center; }
-.metal-label .pulse-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--up);
-  display: inline-block;
-  margin-right: 6px;
-  transition: background 0.2s;
-}
-.metal-label .pulse-dot.err { background: var(--down); }
-.metal-label .unit { font-size: 10.5px; color: var(--text-faint); }
-
-.metal-readings { display: flex; gap: 26px; flex: 1; flex-wrap: wrap; }
-
-.reading { display: flex; flex-direction: column; gap: 2px; }
-.reading .r-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); }
-.reading .r-value { font-family: var(--font-mono); font-size: 17px; font-weight: 600; }
-.reading .r-change { font-family: var(--font-mono); font-size: 11.5px; }
+.add-row:hover { background: var(--surface-2); }
+.add-row-icon { font-size: 15px; line-height: 1; }
 
 .up { color: var(--up); }
 .down { color: var(--down); }
@@ -192,18 +166,6 @@ button, input, select { font-family: inherit; }
   margin: 0; font-size: 14px; font-weight: 600;
   color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em;
 }
-
-.add-btn {
-  background: var(--gold);
-  color: #201a0c;
-  border: none;
-  font-weight: 600;
-  font-size: 12.5px;
-  padding: 6px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.add-btn:hover { filter: brightness(1.08); }
 
 .table-head {
   display: grid;

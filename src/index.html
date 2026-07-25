@@ -21,37 +21,13 @@
       </div>
     </header>
 
-    <section class="metals-strip" id="metalsStrip">
-      <div class="metal-card gold" id="goldCard">
-        <div class="metal-label">
-          <span class="name"><span class="pulse-dot"></span>Gold</span>
-          <span class="unit">COMEX spot</span>
-        </div>
-        <div class="metal-readings" id="goldReadings">
-          <div class="reading"><span class="r-label">USD / oz</span><span class="r-value">&mdash;</span></div>
-          <div class="reading"><span class="r-label">INR / 10g</span><span class="r-value">&mdash;</span></div>
-        </div>
-      </div>
-      <div class="metal-card silver" id="silverCard">
-        <div class="metal-label">
-          <span class="name"><span class="pulse-dot"></span>Silver</span>
-          <span class="unit">COMEX spot</span>
-        </div>
-        <div class="metal-readings" id="silverReadings">
-          <div class="reading"><span class="r-label">USD / oz</span><span class="r-value">&mdash;</span></div>
-          <div class="reading"><span class="r-label">INR / kg</span><span class="r-value">&mdash;</span></div>
-        </div>
-      </div>
-    </section>
-    <p class="metals-note">INR figures are spot price converted at the live USD-INR rate — reference only, not your local jeweler/MCX quote (duty, GST, and local premium aren't in a futures price).</p>
-
     <main class="main-grid">
 
       <section class="watchlist-panel">
         <div class="panel-head">
           <h2>Watchlist</h2>
-          <button class="add-btn" id="openAddBtn">+ Add</button>
         </div>
+        <p class="list-note">Gold/Silver INR figures are spot-converted — not your local jeweler/MCX rate.</p>
 
         <div class="table-head">
           <span class="col-name">Name</span>
@@ -60,12 +36,7 @@
           <span></span>
         </div>
 
-        <div class="table-body" id="watchlistBody">
-          <div class="empty-state" id="emptyState">
-            <p>Nothing here yet.</p>
-            <p class="empty-sub">Add a stock, ETF, or mutual fund to start tracking it.</p>
-          </div>
-        </div>
+        <div class="table-body" id="watchlistBody"></div>
       </section>
 
       <section class="chart-panel" id="chartPanel">
