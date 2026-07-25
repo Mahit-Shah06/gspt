@@ -330,7 +330,10 @@ function refreshActiveChartHeader() {
   }
 }
 
+let chartRequestId = 0;
+
 async function loadChartData(item) {
+  const requestId = ++chartRequestId;
   const wrap = document.querySelector(".chart-canvas-wrap");
   const existingError = wrap.querySelector(".chart-error");
   if (existingError) existingError.remove();
@@ -354,10 +357,14 @@ async function loadChartData(item) {
       const hist = await invoke("get_history", { symbol: item.symbol, range: rangeDef.range, interval: rangeDef.interval });
       points = hist.points;
     }
+    if (requestId !== chartRequestId) return; // a newer request superseded this one — drop stale result
     renderChart(points);
   } catch (err) {
+    if (requestId !== chartRequestId) return;
     console.error("chart load failed", err);
-    if (state.chart) { state.chart.destroy(); state.chart = null; }
+    const existing = Chart.getChart(document.getElementById("priceChart"));
+    if (existing) existing.destroy();
+    state.chart = null;
     const div = document.createElement("div");
     div.className = "chart-error";
     div.textContent = "Could not load chart data: " + String(err).slice(0, 140);
@@ -367,7 +374,12 @@ async function loadChartData(item) {
 
 function renderChart(points) {
   const canvas = document.getElementById("priceChart");
-  if (state.chart) state.chart.destroy();
+  // Ask Chart.js's own registry, not just our local variable — if state.chart
+  // ever gets out of sync with what's actually attached to the canvas (e.g.
+  // an out-of-order async response), this is what actually prevents the
+  // "canvas already in use" crash instead of just usually avoiding it.
+  const existing = Chart.getChart(canvas);
+  if (existing) existing.destroy();
 
   const labels = points.map((p) => new Date(p.t));
   const data = points.map((p) => p.c);
