@@ -69,17 +69,17 @@ function escapeHtml(s) {
 // the detail header, and the chart's y-axis, so all three always agree.
 function conversionFor(item, quote) {
   if (state.settings.displayCurrency !== "inr" || state.usdInr == null) {
-    return { factor: 1, currency: (quote && quote.currency) || "USD", suffix: "" };
+    return { factor: 1, currency: (quote && quote.currency) || "USD" };
   }
   if (item.kind === "metal") {
     const metal = METALS.find((m) => m.id === item.id);
     const factor = (state.usdInr / TROY_OZ_TO_GRAMS) * metal.gramsPerUnit;
-    return { factor, currency: "INR", suffix: ` /${metal.inrUnitLabel}` };
+    return { factor, currency: "INR" };
   }
   if (quote && quote.currency === "USD") {
-    return { factor: state.usdInr, currency: "INR", suffix: "" };
+    return { factor: state.usdInr, currency: "INR" };
   }
-  return { factor: 1, currency: (quote && quote.currency) || "", suffix: "" };
+  return { factor: 1, currency: (quote && quote.currency) || "" };
 }
 
 // ---------- init ----------
@@ -195,14 +195,14 @@ function buildMetalRow(metal) {
     priceText = "err";
   } else if (q && q.price != null) {
     const conv = conversionFor(item, q);
-    priceText = formatMoney(q.price * conv.factor, conv.currency) + conv.suffix;
+    priceText = formatMoney(q.price * conv.factor, conv.currency);
     const convertedChange = q.change != null ? q.change * conv.factor : null;
     const ch = formatChange(convertedChange, q.changePercent);
     changeText = ch.text;
     changeCls = ch.cls;
 
     if (conv.currency === "INR") {
-      sub = `${metal.sub} \u00b7 $${q.price.toFixed(2)}/oz spot`;
+      sub = `${metal.sub}, per ${metal.inrUnitLabel} \u00b7 $${q.price.toFixed(2)}/oz spot`;
     } else {
       const inrText = metalInrText(metal);
       sub = metal.sub + (inrText ? ` \u00b7 ${inrText}` : "");
@@ -249,7 +249,7 @@ function buildWatchRow(item) {
     priceText = "err";
   } else if (q && q.price != null) {
     const conv = conversionFor(item, q);
-    priceText = formatMoney(q.price * conv.factor, conv.currency) + conv.suffix;
+    priceText = formatMoney(q.price * conv.factor, conv.currency);
     const convertedChange = q.change != null ? q.change * conv.factor : null;
     const ch = formatChange(convertedChange, q.changePercent);
     changeText = ch.text;
@@ -375,7 +375,7 @@ function refreshActiveChartHeader() {
     changeEl.textContent = "";
   } else {
     const conv = conversionFor(item, q);
-    priceEl.textContent = formatMoney(q.price * conv.factor, conv.currency) + conv.suffix;
+    priceEl.textContent = formatMoney(q.price * conv.factor, conv.currency);
     const convertedChange = q.change != null ? q.change * conv.factor : null;
     const ch = formatChange(convertedChange, q.changePercent);
     changeEl.textContent = ch.text;
@@ -384,7 +384,7 @@ function refreshActiveChartHeader() {
     if (item.kind === "metal") {
       const metal = METALS.find((m) => m.id === item.id);
       if (conv.currency === "INR") {
-        document.getElementById("chartSub").textContent = `${item.sub} \u00b7 $${q.price.toFixed(2)}/oz spot`;
+        document.getElementById("chartSub").textContent = `${item.sub}, per ${metal.inrUnitLabel} \u00b7 $${q.price.toFixed(2)}/oz spot`;
       } else {
         const inrText = metalInrText(metal);
         document.getElementById("chartSub").textContent = item.sub + (inrText ? ` \u00b7 ${inrText}` : "");

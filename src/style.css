@@ -167,7 +167,7 @@ button, input, select { font-family: inherit; }
 
 .table-head {
   display: grid;
-  grid-template-columns: 1fr 90px 100px 28px;
+  grid-template-columns: 1fr 100px 100px 28px;
   gap: 8px;
   padding: 0 16px 8px;
   font-size: 10.5px;
@@ -182,7 +182,7 @@ button, input, select { font-family: inherit; }
 
 .watch-row {
   display: grid;
-  grid-template-columns: 1fr 90px 100px 28px;
+  grid-template-columns: 1fr 100px 100px 28px;
   gap: 8px;
   align-items: center;
   padding: 10px 8px;
@@ -198,7 +198,7 @@ button, input, select { font-family: inherit; }
 .wr-name .n { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; }
 .wr-name .s { font-size: 10.5px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.wr-price { font-family: var(--font-mono); font-size: 13px; text-align: right; }
+.wr-price { font-family: var(--font-mono); font-size: 13px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .wr-change-pill {
   font-family: var(--font-mono); font-size: 11px; font-weight: 600;
