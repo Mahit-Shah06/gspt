@@ -1,0 +1,12 @@
+{
+  "name": "gspt",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Gold-Silver Price Tracker",
+  "scripts": {
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

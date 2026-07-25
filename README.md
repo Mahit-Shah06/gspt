@@ -35,8 +35,9 @@ isn't reliable enough to bother with — run this step on your machine.
 
 ## Branch workflow
 
-Same as the other repos: work stays on `develop`, `main` only gets
-merged into on explicit instruction. Tags on `main` only.
+Single `master` branch, direct commits. No develop/main split — this
+is a solo personal project, that split earned its keep on menu-xr
+because of interns and a live prod split; neither applies here.
 
 ## Status
 
