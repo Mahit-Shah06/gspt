@@ -1,0 +1,93 @@
+:root {
+  --gold: #c9a24b;
+  --up: #4caf82;
+  --down: #d9694f;
+  --text: #e8e6e0;
+  --text-dim: #8b8d94;
+  --font-mono: "Cascadia Code", "SF Mono", Consolas, ui-monospace, monospace;
+  --font-ui: -apple-system, "Segoe UI", Inter, system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-ui);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+.widget-card {
+  position: relative;
+  height: 100%;
+  background: rgba(13, 14, 18, 0.7);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: move;
+}
+
+.widget-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-radius: 5px;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.widget-close:hover { background: rgba(217, 105, 79, 0.3); color: var(--down); }
+
+.widget-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding-right: 20px;
+}
+.widget-name {
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px;
+}
+.widget-price { font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+.widget-change {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  display: block;
+  margin-bottom: 4px;
+  text-align: right;
+}
+.widget-change.up { color: var(--up); }
+.widget-change.down { color: var(--down); }
+.widget-change.flat { color: var(--text-dim); }
+
+.widget-ratio-row {
+  margin-top: 2px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.widget-ratio-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+.widget-ratio-value { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--gold); }

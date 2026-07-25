@@ -114,6 +114,31 @@
       </div>
       <p class="field-hint">Click, then press a combo (needs at least one of Ctrl/Alt/Shift/Win). Works even when RAPT isn't focused. The <code>Fn</code> key can't be captured by any app — your keyboard handles it in hardware before Windows ever sees it, so pick a different modifier.</p>
 
+      <label class="field-label currency-label">Desktop widget</label>
+      <label class="startup-toggle">
+        <input type="checkbox" id="widgetEnabledToggle" />
+        <span>Show floating widget</span>
+      </label>
+
+      <div class="widget-picker-row">
+        <div class="dropdown" id="widgetADropdown">
+          <button class="dropdown-trigger" id="widgetATrigger" type="button">
+            <span id="widgetATriggerLabel">Gold</span>
+            <span class="dropdown-caret">&#9662;</span>
+          </button>
+          <div class="dropdown-menu" id="widgetAMenu" hidden></div>
+        </div>
+        <span class="widget-picker-slash">/</span>
+        <div class="dropdown" id="widgetBDropdown">
+          <button class="dropdown-trigger" id="widgetBTrigger" type="button">
+            <span id="widgetBTriggerLabel">Silver</span>
+            <span class="dropdown-caret">&#9662;</span>
+          </button>
+          <div class="dropdown-menu" id="widgetBMenu" hidden></div>
+        </div>
+      </div>
+      <p class="field-hint">Widget shows these two plus their ratio. Drag it anywhere on your desktop; its own &times; hides it too.</p>
+
       <p class="field-error" id="settingsError"></p>
     </div>
   </div>

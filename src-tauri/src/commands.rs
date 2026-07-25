@@ -1,4 +1,4 @@
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tauri_plugin_autostart::ManagerExt;
 
 use crate::market::{self, History, Quote};
@@ -86,4 +86,23 @@ pub fn shortcut_set(app: AppHandle, shortcut: String) -> Result<(), String> {
         .parse()
         .map_err(|_| format!("Could not parse shortcut: {trimmed}"))?;
     gs.register(parsed).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn widget_toggle(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = store::load_settings(&app)?;
+    settings.widget_enabled = enabled;
+    store::save_settings(&app, &settings)?;
+
+    if let Some(window) = app.get_webview_window("widget") {
+        if enabled {
+            if let (Some(x), Some(y)) = (settings.widget_x, settings.widget_y) {
+                let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
+            }
+            let _ = window.show();
+        } else {
+            let _ = window.hide();
+        }
+    }
+    Ok(())
 }

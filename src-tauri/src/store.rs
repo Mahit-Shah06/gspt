@@ -20,6 +20,11 @@ pub struct Settings {
     pub hidden_metals: Vec<String>,
     pub display_currency: String, // "inr" | "native"
     pub global_shortcut: String,  // empty = unset, else an accelerator like "Alt+Shift+KeyG"
+    pub widget_enabled: bool,
+    pub widget_asset_a: String, // "kind:id", e.g. "metal:gold", "yahoo:AAPL", "mf_in:120503"
+    pub widget_asset_b: String,
+    pub widget_x: Option<i32>,
+    pub widget_y: Option<i32>,
 }
 
 impl Default for Settings {
@@ -29,6 +34,11 @@ impl Default for Settings {
             hidden_metals: Vec::new(),
             display_currency: "inr".to_string(),
             global_shortcut: String::new(),
+            widget_enabled: false,
+            widget_asset_a: "metal:gold".to_string(),
+            widget_asset_b: "metal:silver".to_string(),
+            widget_x: None,
+            widget_y: None,
         }
     }
 }

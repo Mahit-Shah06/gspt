@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>RAPT Widget</title>
+<link rel="stylesheet" href="widget.css" />
+</head>
+<body>
+  <div class="widget-card" data-tauri-drag-region>
+    <button class="widget-close" id="widgetClose" title="Hide widget">&times;</button>
+
+    <div class="widget-row">
+      <span class="widget-name" id="nameA">&mdash;</span>
+      <span class="widget-price" id="priceA">&mdash;</span>
+    </div>
+    <span class="widget-change" id="changeA">&mdash;</span>
+
+    <div class="widget-row">
+      <span class="widget-name" id="nameB">&mdash;</span>
+      <span class="widget-price" id="priceB">&mdash;</span>
+    </div>
+    <span class="widget-change" id="changeB">&mdash;</span>
+
+    <div class="widget-ratio-row">
+      <span class="widget-ratio-label">Ratio</span>
+      <span class="widget-ratio-value" id="ratioValue">&mdash;</span>
+    </div>
+  </div>
+
+  <script src="widget.js"></script>
+</body>
+</html>

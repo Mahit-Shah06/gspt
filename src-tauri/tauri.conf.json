@@ -17,6 +17,22 @@
         "minWidth": 860,
         "minHeight": 580,
         "backgroundColor": "#0d0e12"
+      },
+      {
+        "label": "widget",
+        "url": "widget.html",
+        "title": "RAPT Widget",
+        "width": 280,
+        "height": 150,
+        "x": 80,
+        "y": 80,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "visible": false
       }
     ],
     "trayIcon": {

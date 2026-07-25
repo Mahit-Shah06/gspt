@@ -27,7 +27,15 @@ const state = {
   quotes: {},       // id -> { price, change, changePercent, currency, error, ...statsFields } — also holds "gold"/"silver"
   usdInr: null,
   mfCache: {},       // schemeCode -> full MfData
-  settings: { refreshIntervalSecs: 15, hiddenMetals: [], displayCurrency: "inr", globalShortcut: "" },
+  settings: {
+    refreshIntervalSecs: 15,
+    hiddenMetals: [],
+    displayCurrency: "inr",
+    globalShortcut: "",
+    widgetEnabled: false,
+    widgetAssetA: "metal:gold",
+    widgetAssetB: "metal:silver"
+  },
   refreshTimer: null,
   activeItemId: null,
   activeRangeKey: null,
@@ -767,9 +775,79 @@ async function addFromSearch(item, btn) {
 function openSettingsModal() {
   document.getElementById("settingsModalBackdrop").hidden = false;
   document.getElementById("settingsError").textContent = "";
+  document.getElementById("widgetEnabledToggle").checked = !!state.settings.widgetEnabled;
+  populateWidgetDropdown("widgetAMenu", "widgetATriggerLabel", state.settings.widgetAssetA, (value, label) =>
+    saveWidgetAsset("widgetAssetA", value, label)
+  );
+  populateWidgetDropdown("widgetBMenu", "widgetBTriggerLabel", state.settings.widgetAssetB, (value, label) =>
+    saveWidgetAsset("widgetAssetB", value, label)
+  );
 }
 function closeSettingsModal() {
   document.getElementById("settingsModalBackdrop").hidden = true;
+}
+
+// ---------- widget picker ----------
+
+function widgetAssetOptions() {
+  const options = [
+    { value: "metal:gold", label: "Gold" },
+    { value: "metal:silver", label: "Silver" }
+  ];
+  for (const item of state.watchlist) {
+    options.push({ value: `${item.kind}:${item.symbol}`, label: item.label });
+  }
+  return options;
+}
+
+function populateWidgetDropdown(menuId, triggerLabelId, currentValue, onSelect) {
+  const menu = document.getElementById(menuId);
+  const options = widgetAssetOptions();
+  menu.innerHTML = "";
+  for (const opt of options) {
+    const item = document.createElement("div");
+    item.className = "dropdown-item" + (opt.value === currentValue ? " selected" : "");
+    item.textContent = opt.label;
+    item.addEventListener("click", () => onSelect(opt.value, opt.label));
+    menu.appendChild(item);
+  }
+  const match = options.find((o) => o.value === currentValue);
+  document.getElementById(triggerLabelId).textContent = match ? match.label : currentValue;
+}
+
+async function saveWidgetAsset(slot, value, label) {
+  state.settings[slot] = value;
+  document.getElementById(slot === "widgetAssetA" ? "widgetATriggerLabel" : "widgetBTriggerLabel").textContent = label;
+  document.getElementById(slot === "widgetAssetA" ? "widgetAMenu" : "widgetBMenu").hidden = true;
+  try {
+    await invoke("settings_save", { settings: state.settings });
+  } catch (err) {
+    document.getElementById("settingsError").textContent = "Could not save: " + String(err).slice(0, 120);
+  }
+}
+
+function wireWidgetPickers() {
+  document.getElementById("widgetATrigger").addEventListener("click", () => {
+    document.getElementById("widgetAMenu").hidden = !document.getElementById("widgetAMenu").hidden;
+  });
+  document.getElementById("widgetBTrigger").addEventListener("click", () => {
+    document.getElementById("widgetBMenu").hidden = !document.getElementById("widgetBMenu").hidden;
+  });
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("#widgetADropdown")) document.getElementById("widgetAMenu").hidden = true;
+    if (!e.target.closest("#widgetBDropdown")) document.getElementById("widgetBMenu").hidden = true;
+  });
+
+  document.getElementById("widgetEnabledToggle").addEventListener("change", async (e) => {
+    const enabled = e.target.checked;
+    try {
+      await invoke("widget_toggle", { enabled });
+      state.settings.widgetEnabled = enabled;
+    } catch (err) {
+      e.target.checked = !enabled;
+      document.getElementById("settingsError").textContent = "Could not toggle widget: " + String(err).slice(0, 120);
+    }
+  });
 }
 
 function syncIntervalDropdownUI() {
@@ -953,6 +1031,7 @@ function wireStaticEvents() {
   wireIntervalDropdown();
   wireCurrencySegmented();
   wireShortcutRecorder();
+  wireWidgetPickers();
 
   document.getElementById("startupToggle").addEventListener("change", async (e) => {
     const enabled = e.target.checked;
