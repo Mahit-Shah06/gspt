@@ -1,0 +1,21 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/Cargo.lock
+
+# Build output
+dist/
+build/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
