@@ -11,6 +11,7 @@ use tauri::{
     Manager, WindowEvent,
 };
 use tauri_plugin_autostart::MacosLauncher;
+use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 fn main() {
     tauri::Builder::default()
@@ -18,6 +19,18 @@ fn main() {
             MacosLauncher::LaunchAgent,
             None,
         ))
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _shortcut, event| {
+                    // We only ever register one shortcut at a time (the show/hide
+                    // toggle), so any fire of it means the same thing regardless
+                    // of which shortcut string it currently is.
+                    if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                        toggle_main_window(app);
+                    }
+                })
+                .build(),
+        )
         .setup(|app| {
             let show_item = MenuItem::with_id(app, "show", "Show RAPT", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
@@ -44,6 +57,17 @@ fn main() {
                 })
                 .build(app)?;
 
+            // Re-register whatever shortcut was saved from a previous session.
+            let settings = store::load_settings(&app.handle()).unwrap_or_default();
+            if !settings.global_shortcut.trim().is_empty() {
+                if let Ok(shortcut) = settings
+                    .global_shortcut
+                    .parse::<tauri_plugin_global_shortcut::Shortcut>()
+                {
+                    let _ = app.global_shortcut().register(shortcut);
+                }
+            }
+
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -66,6 +90,7 @@ fn main() {
             commands::settings_save,
             commands::autostart_get,
             commands::autostart_set,
+            commands::shortcut_set,
         ])
         .run(tauri::generate_context!())
         .expect("error while running RAPT");
@@ -76,5 +101,19 @@ fn restore_main_window(app: &tauri::AppHandle) {
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
+    }
+}
+
+fn toggle_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let is_visible = window.is_visible().unwrap_or(false);
+        let is_minimized = window.is_minimized().unwrap_or(false);
+        if is_visible && !is_minimized {
+            let _ = window.hide();
+        } else {
+            let _ = window.unminimize();
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
     }
 }

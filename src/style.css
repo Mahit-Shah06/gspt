@@ -289,6 +289,13 @@ button, input, select { font-family: inherit; }
 }
 .segmented-btn.active { background: var(--gold); color: #201a0c; }
 
+.shortcut-row { display: flex; gap: 8px; align-items: center; }
+.shortcut-row .dropdown-trigger { cursor: default; }
+.shortcut-row .dropdown-trigger:hover { border-color: var(--border); }
+.shortcut-row .dropdown-trigger.recording { border-color: var(--gold); color: var(--gold); animation: pulse-border 1s ease-in-out infinite; }
+@keyframes pulse-border { 50% { border-color: var(--gold-dim); } }
+.field-hint code { background: var(--surface-2); padding: 1px 4px; border-radius: 4px; font-family: var(--font-mono); }
+
 /* ---------- custom dropdown (native <select> renders unstyled/broken on Linux WebKitGTK) ---------- */
 
 .dropdown { position: relative; }

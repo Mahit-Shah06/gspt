@@ -105,6 +105,15 @@
         <span>Start with Windows</span>
       </label>
 
+      <label class="field-label currency-label">Show/hide shortcut</label>
+      <div class="shortcut-row">
+        <button class="dropdown-trigger" id="shortcutTrigger" type="button">
+          <span id="shortcutLabel">Not set</span>
+        </button>
+        <button class="icon-btn ghost" id="clearShortcutBtn" title="Clear">&times;</button>
+      </div>
+      <p class="field-hint">Click, then press a combo (needs at least one of Ctrl/Alt/Shift/Win). Works even when RAPT isn't focused. The <code>Fn</code> key can't be captured by any app — your keyboard handles it in hardware before Windows ever sees it, so pick a different modifier.</p>
+
       <p class="field-error" id="settingsError"></p>
     </div>
   </div>

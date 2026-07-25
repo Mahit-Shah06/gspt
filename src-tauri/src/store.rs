@@ -19,6 +19,7 @@ pub struct Settings {
     pub refresh_interval_secs: u64,
     pub hidden_metals: Vec<String>,
     pub display_currency: String, // "inr" | "native"
+    pub global_shortcut: String,  // empty = unset, else an accelerator like "Alt+Shift+KeyG"
 }
 
 impl Default for Settings {
@@ -27,6 +28,7 @@ impl Default for Settings {
             refresh_interval_secs: 15,
             hidden_metals: Vec::new(),
             display_currency: "inr".to_string(),
+            global_shortcut: String::new(),
         }
     }
 }

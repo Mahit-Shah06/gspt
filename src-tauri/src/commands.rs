@@ -65,3 +65,25 @@ pub fn autostart_set(app: AppHandle, enabled: bool) -> Result<bool, String> {
     }
     manager.is_enabled().map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub fn shortcut_set(app: AppHandle, shortcut: String) -> Result<(), String> {
+    use tauri_plugin_global_shortcut::GlobalShortcutExt;
+
+    let gs = app.global_shortcut();
+    gs.unregister_all().map_err(|e| e.to_string())?;
+
+    let mut settings = store::load_settings(&app)?;
+    settings.global_shortcut = shortcut.clone();
+    store::save_settings(&app, &settings)?;
+
+    let trimmed = shortcut.trim();
+    if trimmed.is_empty() {
+        return Ok(());
+    }
+
+    let parsed: tauri_plugin_global_shortcut::Shortcut = trimmed
+        .parse()
+        .map_err(|_| format!("Could not parse shortcut: {trimmed}"))?;
+    gs.register(parsed).map_err(|e| e.to_string())
+}

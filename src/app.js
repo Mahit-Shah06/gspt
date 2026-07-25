@@ -27,12 +27,13 @@ const state = {
   quotes: {},       // id -> { price, change, changePercent, currency, error, ...statsFields } — also holds "gold"/"silver"
   usdInr: null,
   mfCache: {},       // schemeCode -> full MfData
-  settings: { refreshIntervalSecs: 15, hiddenMetals: [], displayCurrency: "inr" },
+  settings: { refreshIntervalSecs: 15, hiddenMetals: [], displayCurrency: "inr", globalShortcut: "" },
   refreshTimer: null,
   activeItemId: null,
   activeRangeKey: null,
   chart: null,
   editMode: false,
+  recordingShortcut: false,
   searchDebounce: null
 };
 
@@ -100,6 +101,7 @@ async function init() {
 
   syncIntervalDropdownUI();
   syncCurrencySegmentedUI();
+  syncShortcutLabel();
   renderList();
   wireStaticEvents();
 
@@ -834,6 +836,90 @@ function wireCurrencySegmented() {
   });
 }
 
+// ---------- global shortcut ----------
+
+function formatAcceleratorForDisplay(accel) {
+  if (!accel) return "Not set";
+  return accel
+    .split("+")
+    .map((part) => {
+      if (part === "Control") return "Ctrl";
+      if (part === "Super") return "Win";
+      if (part.startsWith("Key")) return part.slice(3);
+      if (part.startsWith("Digit")) return part.slice(5);
+      return part;
+    })
+    .join("+");
+}
+
+function syncShortcutLabel() {
+  document.getElementById("shortcutLabel").textContent = formatAcceleratorForDisplay(state.settings.globalShortcut);
+}
+
+function wireShortcutRecorder() {
+  const trigger = document.getElementById("shortcutTrigger");
+  const label = document.getElementById("shortcutLabel");
+  const clearBtn = document.getElementById("clearShortcutBtn");
+
+  trigger.addEventListener("click", () => {
+    if (state.recordingShortcut) return;
+    state.recordingShortcut = true;
+    trigger.classList.add("recording");
+    label.textContent = "Press a combo\u2026";
+  });
+
+  document.addEventListener("keydown", async (e) => {
+    if (!state.recordingShortcut) return;
+    e.preventDefault();
+
+    if (e.key === "Escape") {
+      state.recordingShortcut = false;
+      trigger.classList.remove("recording");
+      syncShortcutLabel();
+      return;
+    }
+    // wait for a real key, not just the modifier being held down
+    if (["Control", "Alt", "Shift", "Meta"].includes(e.key)) return;
+
+    const mods = [];
+    if (e.ctrlKey) mods.push("Control");
+    if (e.altKey) mods.push("Alt");
+    if (e.shiftKey) mods.push("Shift");
+    if (e.metaKey) mods.push("Super");
+
+    state.recordingShortcut = false;
+    trigger.classList.remove("recording");
+
+    if (mods.length === 0) {
+      syncShortcutLabel();
+      document.getElementById("settingsError").textContent = "Needs at least one modifier (Ctrl/Alt/Shift/Win) — a bare key would fire on every keystroke everywhere.";
+      return;
+    }
+
+    const accelerator = [...mods, e.code].join("+");
+    label.textContent = formatAcceleratorForDisplay(accelerator);
+    document.getElementById("settingsError").textContent = "";
+    try {
+      await invoke("shortcut_set", { shortcut: accelerator });
+      state.settings.globalShortcut = accelerator;
+    } catch (err) {
+      document.getElementById("settingsError").textContent = "Could not set shortcut (likely already used by another app): " + String(err).slice(0, 140);
+      syncShortcutLabel();
+    }
+  });
+
+  clearBtn.addEventListener("click", async () => {
+    try {
+      await invoke("shortcut_set", { shortcut: "" });
+      state.settings.globalShortcut = "";
+      syncShortcutLabel();
+      document.getElementById("settingsError").textContent = "";
+    } catch (err) {
+      document.getElementById("settingsError").textContent = "Could not clear: " + String(err).slice(0, 120);
+    }
+  });
+}
+
 // ---------- wiring ----------
 
 function wireStaticEvents() {
@@ -866,6 +952,7 @@ function wireStaticEvents() {
 
   wireIntervalDropdown();
   wireCurrencySegmented();
+  wireShortcutRecorder();
 
   document.getElementById("startupToggle").addEventListener("change", async (e) => {
     const enabled = e.target.checked;
