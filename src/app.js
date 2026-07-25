@@ -1,7 +1,5 @@
 const invoke = (cmd, args) => window.__TAURI__.core.invoke(cmd, args);
 
-const TROY_OZ_TO_GRAMS = 31.1034768;
-
 const YF_RANGES = [
   { key: "1d", label: "1D", range: "1d", interval: "5m" },
   { key: "5d", label: "1W", range: "5d", interval: "15m" },
@@ -20,8 +18,8 @@ const MF_RANGES = [
 ];
 
 const METALS = [
-  { id: "gold", symbol: "GC=F", label: "Gold", sub: "COMEX spot", gramsPerUnit: 10, inrUnitLabel: "10g" },
-  { id: "silver", symbol: "SI=F", label: "Silver", sub: "COMEX spot", gramsPerUnit: 1000, inrUnitLabel: "kg" }
+  { id: "gold", symbol: "GC=F", inSymbol: "GOLDBEES.NS", label: "Gold", sub: "COMEX spot", inLabel: "GOLDBEES \u00b7 NSE" },
+  { id: "silver", symbol: "SI=F", inSymbol: "SILVERBEES.NS", label: "Silver", sub: "COMEX spot", inLabel: "SILVERBEES \u00b7 NSE" }
 ];
 
 const state = {
@@ -70,11 +68,6 @@ function escapeHtml(s) {
 function conversionFor(item, quote) {
   if (state.settings.displayCurrency !== "inr" || state.usdInr == null) {
     return { factor: 1, currency: (quote && quote.currency) || "USD" };
-  }
-  if (item.kind === "metal") {
-    const metal = METALS.find((m) => m.id === item.id);
-    const factor = (state.usdInr / TROY_OZ_TO_GRAMS) * metal.gramsPerUnit;
-    return { factor, currency: "INR" };
   }
   if (quote && quote.currency === "USD") {
     return { factor: state.usdInr, currency: "INR" };
@@ -131,26 +124,22 @@ function setLastUpdated() {
 // ---------- gold / silver ----------
 
 async function fetchGoldSilver() {
-  const [gold, silver, fx] = await Promise.allSettled([
+  const [gold, silver, fx, goldIn, silverIn] = await Promise.allSettled([
     invoke("get_quote", { symbol: "GC=F" }),
     invoke("get_quote", { symbol: "SI=F" }),
-    invoke("get_quote", { symbol: "INR=X" })
+    invoke("get_quote", { symbol: "INR=X" }),
+    invoke("get_quote", { symbol: "GOLDBEES.NS" }),
+    invoke("get_quote", { symbol: "SILVERBEES.NS" })
   ]);
 
   state.usdInr = fx.status === "fulfilled" ? fx.value.price : null;
   state.quotes.gold = gold.status === "fulfilled" ? gold.value : { error: true };
   state.quotes.silver = silver.status === "fulfilled" ? silver.value : { error: true };
+  state.quotes.goldIN = goldIn.status === "fulfilled" ? goldIn.value : { error: true };
+  state.quotes.silverIN = silverIn.status === "fulfilled" ? silverIn.value : { error: true };
 
   renderList();
   if (state.activeItemId === "gold" || state.activeItemId === "silver") refreshActiveChartHeader();
-}
-
-function metalInrText(metal) {
-  const q = state.quotes[metal.id];
-  if (!q || q.error || q.price == null || state.usdInr == null) return null;
-  const perGram = q.price / TROY_OZ_TO_GRAMS;
-  const value = perGram * state.usdInr * metal.gramsPerUnit;
-  return `\u2248 ${formatMoney(value, "INR")} / ${metal.inrUnitLabel}`;
 }
 
 // ---------- list rendering ----------
@@ -190,26 +179,29 @@ function buildMetalRow(metal) {
   const row = document.createElement("div");
   row.className = "watch-row" + (state.activeItemId === metal.id ? " active" : "") + (hidden ? " row-hidden" : "");
 
-  const q = state.quotes[metal.id];
-  const item = { id: metal.id, kind: "metal" };
+  const comexQ = state.quotes[metal.id];
+  const inQ = state.quotes[metal.id + "IN"];
+  const useInr = state.settings.displayCurrency === "inr";
   let priceText = "\u2014", changeText = "\u2014", changeCls = "flat", sub = metal.sub;
 
-  if (q && q.error) {
+  if (useInr) {
+    if (inQ && inQ.error) {
+      priceText = "err";
+    } else if (inQ && inQ.price != null) {
+      priceText = formatMoney(inQ.price, "INR");
+      const ch = formatChange(inQ.change, inQ.changePercent);
+      changeText = ch.text;
+      changeCls = ch.cls;
+      sub = `${metal.inLabel}` + (comexQ && comexQ.price != null ? ` \u00b7 $${comexQ.price.toFixed(2)}/oz global spot` : "");
+    }
+  } else if (comexQ && comexQ.error) {
     priceText = "err";
-  } else if (q && q.price != null) {
-    const conv = conversionFor(item, q);
-    priceText = formatMoney(q.price * conv.factor, conv.currency);
-    const convertedChange = q.change != null ? q.change * conv.factor : null;
-    const ch = formatChange(convertedChange, q.changePercent);
+  } else if (comexQ && comexQ.price != null) {
+    priceText = formatMoney(comexQ.price, "USD");
+    const ch = formatChange(comexQ.change, comexQ.changePercent);
     changeText = ch.text;
     changeCls = ch.cls;
-
-    if (conv.currency === "INR") {
-      sub = `${metal.sub}, per ${metal.inrUnitLabel} \u00b7 $${q.price.toFixed(2)}/oz spot`;
-    } else {
-      const inrText = metalInrText(metal);
-      sub = metal.sub + (inrText ? ` \u00b7 ${inrText}` : "");
-    }
+    sub = metal.sub + (inQ && inQ.price != null ? ` \u00b7 ${metal.inLabel} \u20b9${inQ.price.toFixed(2)}` : "");
   }
 
   row.innerHTML = `
@@ -448,6 +440,33 @@ function refreshActiveChartHeader() {
     return;
   }
 
+  if (item.kind === "metal") {
+    const metal = METALS.find((m) => m.id === item.id);
+    const comexQ = state.quotes[metal.id];
+    const inQ = state.quotes[metal.id + "IN"];
+    const useInr = state.settings.displayCurrency === "inr";
+    const primary = useInr ? inQ : comexQ;
+
+    if (!primary || primary.error || primary.price == null) {
+      priceEl.textContent = "\u2014";
+      changeEl.textContent = "";
+    } else {
+      priceEl.textContent = formatMoney(primary.price, useInr ? "INR" : "USD");
+      const ch = formatChange(primary.change, primary.changePercent);
+      changeEl.textContent = ch.text;
+      changeEl.className = "chart-change " + ch.cls;
+
+      const subEl = document.getElementById("chartSub");
+      if (useInr) {
+        subEl.textContent = metal.inLabel + (comexQ && comexQ.price != null ? ` \u00b7 $${comexQ.price.toFixed(2)}/oz global spot` : "");
+      } else {
+        subEl.textContent = metal.sub + (inQ && inQ.price != null ? ` \u00b7 ${metal.inLabel} \u20b9${inQ.price.toFixed(2)}` : "");
+      }
+    }
+    buildStatsGrid(item);
+    return;
+  }
+
   const q = state.quotes[item.id];
 
   if (!q || q.error) {
@@ -460,16 +479,6 @@ function refreshActiveChartHeader() {
     const ch = formatChange(convertedChange, q.changePercent);
     changeEl.textContent = ch.text;
     changeEl.className = "chart-change " + ch.cls;
-
-    if (item.kind === "metal") {
-      const metal = METALS.find((m) => m.id === item.id);
-      if (conv.currency === "INR") {
-        document.getElementById("chartSub").textContent = `${item.sub}, per ${metal.inrUnitLabel} \u00b7 $${q.price.toFixed(2)}/oz spot`;
-      } else {
-        const inrText = metalInrText(metal);
-        document.getElementById("chartSub").textContent = item.sub + (inrText ? ` \u00b7 ${inrText}` : "");
-      }
-    }
   }
 
   buildStatsGrid(item);
@@ -501,6 +510,30 @@ function buildStatsGrid(item) {
     if (g && !g.error && g.price != null) addStat("Gold", `$${g.price.toFixed(2)}/oz`);
     if (s && !s.error && s.price != null) addStat("Silver", `$${s.price.toFixed(2)}/oz`);
     addStat("Reads as", "Oz of silver worth one oz of gold");
+    return;
+  }
+
+  if (item.kind === "metal") {
+    const metal = METALS.find((m) => m.id === item.id);
+    const q = state.quotes[item.id];
+    const inQ = state.quotes[item.id + "IN"];
+
+    if (q && !q.error) {
+      addStat("Exchange", "COMEX");
+      addStat("Open", q.open != null ? formatMoney(q.open, "USD") : null);
+      if (q.dayLow != null && q.dayHigh != null) {
+        addStat("Day Range", `${formatMoney(q.dayLow, "USD")} \u2013 ${formatMoney(q.dayHigh, "USD")}`);
+      }
+      if (q.fiftyTwoWeekLow != null && q.fiftyTwoWeekHigh != null) {
+        addStat("52W Range", `${formatMoney(q.fiftyTwoWeekLow, "USD")} \u2013 ${formatMoney(q.fiftyTwoWeekHigh, "USD")}`);
+      }
+    }
+    if (inQ && !inQ.error && inQ.price != null) {
+      addStat(metal.inLabel, formatMoney(inQ.price, "INR"));
+      if (inQ.dayLow != null && inQ.dayHigh != null) {
+        addStat(`${metal.label} (NSE) Day Range`, `${formatMoney(inQ.dayLow, "INR")} \u2013 ${formatMoney(inQ.dayHigh, "INR")}`);
+      }
+    }
     return;
   }
 
@@ -555,11 +588,17 @@ async function loadChartData(item) {
       }
     } else {
       const rangeDef = YF_RANGES.find((r) => r.key === state.activeRangeKey);
-      const hist = await invoke("get_history", { symbol: item.symbol, range: rangeDef.range, interval: rangeDef.interval });
+      let symbol = item.symbol;
+      if (item.kind === "metal" && state.settings.displayCurrency === "inr") {
+        symbol = METALS.find((m) => m.id === item.id).inSymbol;
+      }
+      const hist = await invoke("get_history", { symbol, range: rangeDef.range, interval: rangeDef.interval });
       points = hist.points;
-      const conv = conversionFor(item, state.quotes[item.id] || hist.quote);
-      if (conv.factor !== 1) {
-        points = points.map((p) => ({ t: p.t, c: p.c * conv.factor }));
+      if (item.kind !== "metal") {
+        const conv = conversionFor(item, state.quotes[item.id] || hist.quote);
+        if (conv.factor !== 1) {
+          points = points.map((p) => ({ t: p.t, c: p.c * conv.factor }));
+        }
       }
     }
     if (requestId !== chartRequestId) return;

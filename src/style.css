@@ -167,7 +167,7 @@ button, input, select { font-family: inherit; }
 
 .table-head {
   display: grid;
-  grid-template-columns: 1fr 100px 100px 28px;
+  grid-template-columns: 1fr 100px 130px 28px;
   gap: 8px;
   padding: 0 16px 8px;
   font-size: 10.5px;
@@ -182,7 +182,7 @@ button, input, select { font-family: inherit; }
 
 .watch-row {
   display: grid;
-  grid-template-columns: 1fr 100px 100px 28px;
+  grid-template-columns: 1fr 100px 130px 28px;
   gap: 8px;
   align-items: center;
   padding: 10px 8px;
@@ -194,16 +194,16 @@ button, input, select { font-family: inherit; }
 .watch-row.active { background: var(--surface-2); outline: 1px solid var(--gold-dim); }
 .watch-row.row-hidden { opacity: 0.45; }
 
-.wr-name { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+.wr-name { display: flex; flex-direction: column; gap: 2px; overflow: hidden; min-width: 0; }
 .wr-name .n { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; }
 .wr-name .s { font-size: 10.5px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.wr-price { font-family: var(--font-mono); font-size: 13px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wr-price { font-family: var(--font-mono); font-size: 13px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 
 .wr-change-pill {
   font-family: var(--font-mono); font-size: 11px; font-weight: 600;
   text-align: center; padding: 3px 7px; border-radius: 20px; white-space: nowrap;
-  justify-self: end;
+  justify-self: end; min-width: 0; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
 }
 .wr-change-pill.up { color: var(--up); background: var(--up-bg); }
 .wr-change-pill.down { color: var(--down); background: var(--down-bg); }
