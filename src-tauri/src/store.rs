@@ -18,6 +18,7 @@ pub struct WatchlistItem {
 pub struct Settings {
     pub refresh_interval_secs: u64,
     pub hidden_metals: Vec<String>,
+    pub display_currency: String, // "inr" | "native"
 }
 
 impl Default for Settings {
@@ -25,6 +26,7 @@ impl Default for Settings {
         Settings {
             refresh_interval_secs: 15,
             hidden_metals: Vec::new(),
+            display_currency: "inr".to_string(),
         }
     }
 }

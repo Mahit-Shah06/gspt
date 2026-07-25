@@ -280,6 +280,14 @@ button, input, select { font-family: inherit; }
 .startup-toggle { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-dim); cursor: pointer; }
 .startup-toggle input { accent-color: var(--gold); cursor: pointer; }
 
+.currency-label { margin-top: 16px; }
+.segmented { display: flex; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+.segmented-btn {
+  flex: 1; background: transparent; border: none; color: var(--text-dim);
+  padding: 8px 6px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.segmented-btn.active { background: var(--gold); color: #201a0c; }
+
 /* ---------- custom dropdown (native <select> renders unstyled/broken on Linux WebKitGTK) ---------- */
 
 .dropdown { position: relative; }

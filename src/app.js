@@ -29,7 +29,7 @@ const state = {
   quotes: {},       // id -> { price, change, changePercent, currency, error, ...statsFields } — also holds "gold"/"silver"
   usdInr: null,
   mfCache: {},       // schemeCode -> full MfData
-  settings: { refreshIntervalSecs: 15, hiddenMetals: [] },
+  settings: { refreshIntervalSecs: 15, hiddenMetals: [], displayCurrency: "inr" },
   refreshTimer: null,
   activeItemId: null,
   activeRangeKey: null,
@@ -64,6 +64,24 @@ function escapeHtml(s) {
   return d.innerHTML;
 }
 
+// Single source of truth for currency display: given an item + its quote,
+// returns a multiplier plus the currency/unit to show. Used for list rows,
+// the detail header, and the chart's y-axis, so all three always agree.
+function conversionFor(item, quote) {
+  if (state.settings.displayCurrency !== "inr" || state.usdInr == null) {
+    return { factor: 1, currency: (quote && quote.currency) || "USD", suffix: "" };
+  }
+  if (item.kind === "metal") {
+    const metal = METALS.find((m) => m.id === item.id);
+    const factor = (state.usdInr / TROY_OZ_TO_GRAMS) * metal.gramsPerUnit;
+    return { factor, currency: "INR", suffix: ` /${metal.inrUnitLabel}` };
+  }
+  if (quote && quote.currency === "USD") {
+    return { factor: state.usdInr, currency: "INR", suffix: "" };
+  }
+  return { factor: 1, currency: (quote && quote.currency) || "", suffix: "" };
+}
+
 // ---------- init ----------
 
 async function init() {
@@ -88,6 +106,7 @@ async function init() {
   }
 
   syncIntervalDropdownUI();
+  syncCurrencySegmentedUI();
   renderList();
   wireStaticEvents();
 
@@ -169,17 +188,26 @@ function buildMetalRow(metal) {
   row.className = "watch-row" + (state.activeItemId === metal.id ? " active" : "") + (hidden ? " row-hidden" : "");
 
   const q = state.quotes[metal.id];
-  let priceText = "\u2014", changeText = "\u2014", changeCls = "flat";
+  const item = { id: metal.id, kind: "metal" };
+  let priceText = "\u2014", changeText = "\u2014", changeCls = "flat", sub = metal.sub;
+
   if (q && q.error) {
     priceText = "err";
-  } else if (q) {
-    priceText = formatMoney(q.price, "USD");
-    const ch = formatChange(q.change, q.changePercent);
+  } else if (q && q.price != null) {
+    const conv = conversionFor(item, q);
+    priceText = formatMoney(q.price * conv.factor, conv.currency) + conv.suffix;
+    const convertedChange = q.change != null ? q.change * conv.factor : null;
+    const ch = formatChange(convertedChange, q.changePercent);
     changeText = ch.text;
     changeCls = ch.cls;
+
+    if (conv.currency === "INR") {
+      sub = `${metal.sub} \u00b7 $${q.price.toFixed(2)}/oz spot`;
+    } else {
+      const inrText = metalInrText(metal);
+      sub = metal.sub + (inrText ? ` \u00b7 ${inrText}` : "");
+    }
   }
-  const inrText = metalInrText(metal);
-  const sub = metal.sub + (inrText ? ` \u00b7 ${inrText}` : "");
 
   row.innerHTML = `
     <div class="wr-name">
@@ -219,9 +247,11 @@ function buildWatchRow(item) {
   let priceText = "\u2014", changeText = "\u2014", changeCls = "flat";
   if (q && q.error) {
     priceText = "err";
-  } else if (q) {
-    priceText = formatMoney(q.price, q.currency);
-    const ch = formatChange(q.change, q.changePercent);
+  } else if (q && q.price != null) {
+    const conv = conversionFor(item, q);
+    priceText = formatMoney(q.price * conv.factor, conv.currency) + conv.suffix;
+    const convertedChange = q.change != null ? q.change * conv.factor : null;
+    const ch = formatChange(convertedChange, q.changePercent);
     changeText = ch.text;
     changeCls = ch.cls;
   }
@@ -344,15 +374,21 @@ function refreshActiveChartHeader() {
     priceEl.textContent = "\u2014";
     changeEl.textContent = "";
   } else {
-    priceEl.textContent = formatMoney(q.price, q.currency || "USD");
-    const ch = formatChange(q.change, q.changePercent);
+    const conv = conversionFor(item, q);
+    priceEl.textContent = formatMoney(q.price * conv.factor, conv.currency) + conv.suffix;
+    const convertedChange = q.change != null ? q.change * conv.factor : null;
+    const ch = formatChange(convertedChange, q.changePercent);
     changeEl.textContent = ch.text;
     changeEl.className = "chart-change " + ch.cls;
 
     if (item.kind === "metal") {
       const metal = METALS.find((m) => m.id === item.id);
-      const inrText = metalInrText(metal);
-      document.getElementById("chartSub").textContent = item.sub + (inrText ? ` \u00b7 ${inrText}` : "");
+      if (conv.currency === "INR") {
+        document.getElementById("chartSub").textContent = `${item.sub} \u00b7 $${q.price.toFixed(2)}/oz spot`;
+      } else {
+        const inrText = metalInrText(metal);
+        document.getElementById("chartSub").textContent = item.sub + (inrText ? ` \u00b7 ${inrText}` : "");
+      }
     }
   }
 
@@ -421,6 +457,10 @@ async function loadChartData(item) {
       const rangeDef = YF_RANGES.find((r) => r.key === state.activeRangeKey);
       const hist = await invoke("get_history", { symbol: item.symbol, range: rangeDef.range, interval: rangeDef.interval });
       points = hist.points;
+      const conv = conversionFor(item, state.quotes[item.id] || hist.quote);
+      if (conv.factor !== 1) {
+        points = points.map((p) => ({ t: p.t, c: p.c * conv.factor }));
+      }
     }
     if (requestId !== chartRequestId) return;
     renderChart(points);
@@ -629,6 +669,32 @@ function wireIntervalDropdown() {
   });
 }
 
+function syncCurrencySegmentedUI() {
+  document.querySelectorAll("#currencySegmented .segmented-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.value === state.settings.displayCurrency);
+  });
+}
+
+function wireCurrencySegmented() {
+  document.querySelectorAll("#currencySegmented .segmented-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (btn.dataset.value === state.settings.displayCurrency) return;
+      state.settings.displayCurrency = btn.dataset.value;
+      syncCurrencySegmentedUI();
+      renderList();
+      if (state.activeItemId) {
+        refreshActiveChartHeader();
+        loadChartData(findActiveItem());
+      }
+      try {
+        await invoke("settings_save", { settings: state.settings });
+      } catch (err) {
+        document.getElementById("settingsError").textContent = "Could not save: " + String(err).slice(0, 120);
+      }
+    });
+  });
+}
+
 // ---------- wiring ----------
 
 function wireStaticEvents() {
@@ -660,6 +726,7 @@ function wireStaticEvents() {
   });
 
   wireIntervalDropdown();
+  wireCurrencySegmented();
 
   document.getElementById("startupToggle").addEventListener("change", async (e) => {
     const enabled = e.target.checked;

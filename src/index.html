@@ -93,6 +93,13 @@
       </div>
       <p class="field-hint">Shorter intervals hit a free, unofficial API harder. If quotes start failing, the manual refresh button still always works — try a longer interval here.</p>
 
+      <label class="field-label currency-label">Show prices in</label>
+      <div class="segmented" id="currencySegmented">
+        <button class="segmented-btn" data-value="inr">INR</button>
+        <button class="segmented-btn" data-value="native">Native currency</button>
+      </div>
+      <p class="field-hint">Only USD-priced items convert (using the live USD-INR rate) — other currencies stay native, no reliable rate for them.</p>
+
       <label class="startup-toggle settings-toggle">
         <input type="checkbox" id="startupToggle" />
         <span>Start with Windows</span>
@@ -103,6 +110,7 @@
   </div>
 
   <script src="vendor/chart.umd.js"></script>
+  <script src="vendor/chartjs-adapter-date-fns.bundle.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
