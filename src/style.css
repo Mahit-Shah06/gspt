@@ -218,6 +218,7 @@ button, input, select { font-family: inherit; }
 .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 7px; flex-shrink: 0; }
 .dot.gold { background: var(--gold); }
 .dot.silver { background: var(--silver); }
+.dot.ratio { background: linear-gradient(135deg, var(--gold) 50%, var(--silver) 50%); }
 
 .empty-state { padding: 30px 20px; text-align: center; color: var(--text-faint); }
 .empty-state p { margin: 4px 0; }

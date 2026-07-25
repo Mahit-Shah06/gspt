@@ -159,16 +159,19 @@ function renderList() {
   const body = document.getElementById("watchlistBody");
   body.innerHTML = "";
 
-  let anyMetalVisible = false;
+  let anyPinnedVisible = false;
   for (const metal of METALS) {
     const row = buildMetalRow(metal);
-    if (row) { body.appendChild(row); anyMetalVisible = true; }
+    if (row) { body.appendChild(row); anyPinnedVisible = true; }
   }
+
+  const ratioRow = buildRatioRow();
+  if (ratioRow) { body.appendChild(ratioRow); anyPinnedVisible = true; }
 
   if (state.watchlist.length === 0) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.innerHTML = anyMetalVisible
+    empty.innerHTML = anyPinnedVisible
       ? `<p class="empty-sub">Nothing else yet — search above to add a stock, ETF, or mutual fund.</p>`
       : `<p class="empty-sub">List's empty. Search above to add something, or hit Edit to bring Gold/Silver back.</p>`;
     body.appendChild(empty);
@@ -232,6 +235,66 @@ function buildMetalRow(metal) {
   } else {
     row.addEventListener("click", () => {
       openChartFor({ id: metal.id, kind: "metal", symbol: metal.symbol, label: metal.label, sub: metal.sub });
+    });
+  }
+
+  return row;
+}
+
+function goldSilverRatio() {
+  const g = state.quotes.gold;
+  const s = state.quotes.silver;
+  if (!g || !s || g.error || s.error || g.price == null || s.price == null || s.price === 0) return null;
+
+  const ratioNow = g.price / s.price;
+  let change = null, changePercent = null;
+  if (g.prevClose != null && s.prevClose != null && s.prevClose !== 0) {
+    const ratioPrev = g.prevClose / s.prevClose;
+    change = ratioNow - ratioPrev;
+    changePercent = ratioPrev !== 0 ? (change / ratioPrev) * 100 : null;
+  }
+  return { ratio: ratioNow, change, changePercent };
+}
+
+function buildRatioRow() {
+  const hidden = state.settings.hiddenMetals.includes("ratio");
+  if (hidden && !state.editMode) return null;
+
+  const row = document.createElement("div");
+  row.className = "watch-row" + (state.activeItemId === "ratio" ? " active" : "") + (hidden ? " row-hidden" : "");
+
+  const r = goldSilverRatio();
+  let priceText = "\u2014", changeText = "\u2014", changeCls = "flat";
+  if (r) {
+    priceText = r.ratio.toFixed(2);
+    const ch = formatChange(r.change, r.changePercent);
+    changeText = ch.text;
+    changeCls = ch.cls;
+  }
+
+  row.innerHTML = `
+    <div class="wr-name">
+      <span class="n"><span class="dot ratio"></span>Gold/Silver Ratio</span>
+      <span class="s">Live \u00b7 oz silver per oz gold</span>
+    </div>
+    <span class="wr-price">${priceText}</span>
+    <span class="wr-change-pill ${changeCls}">${changeText}</span>
+    <span></span>
+  `;
+
+  if (state.editMode) {
+    const btn = document.createElement("button");
+    btn.className = "wr-remove";
+    btn.textContent = hidden ? "+" : "\u00d7";
+    btn.title = hidden ? "Show in list" : "Hide from list";
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleMetalHidden("ratio");
+    });
+    row.lastElementChild.replaceWith(btn);
+  } else {
+    row.addEventListener("click", () => {
+      openChartFor({ id: "ratio", kind: "ratio", label: "Gold/Silver Ratio", sub: "oz silver per oz gold" });
     });
   }
 
@@ -330,6 +393,7 @@ async function refreshWatchlistQuotes(includeMf) {
 function findActiveItem() {
   const metal = METALS.find((m) => m.id === state.activeItemId);
   if (metal) return { id: metal.id, kind: "metal", symbol: metal.symbol, label: metal.label, sub: metal.sub };
+  if (state.activeItemId === "ratio") return { id: "ratio", kind: "ratio", label: "Gold/Silver Ratio", sub: "oz silver per oz gold" };
   return state.watchlist.find((w) => w.id === state.activeItemId);
 }
 
@@ -366,9 +430,25 @@ function openChartFor(item) {
 function refreshActiveChartHeader() {
   const item = findActiveItem();
   if (!item) return;
-  const q = state.quotes[item.id];
   const priceEl = document.getElementById("chartPrice");
   const changeEl = document.getElementById("chartChange");
+
+  if (item.kind === "ratio") {
+    const r = goldSilverRatio();
+    if (!r) {
+      priceEl.textContent = "\u2014";
+      changeEl.textContent = "";
+    } else {
+      priceEl.textContent = r.ratio.toFixed(2);
+      const ch = formatChange(r.change, r.changePercent);
+      changeEl.textContent = ch.text;
+      changeEl.className = "chart-change " + ch.cls;
+    }
+    buildStatsGrid(item);
+    return;
+  }
+
+  const q = state.quotes[item.id];
 
   if (!q || q.error) {
     priceEl.textContent = "\u2014";
@@ -416,6 +496,14 @@ function buildStatsGrid(item) {
     return;
   }
 
+  if (item.kind === "ratio") {
+    const g = state.quotes.gold, s = state.quotes.silver;
+    if (g && !g.error && g.price != null) addStat("Gold", `$${g.price.toFixed(2)}/oz`);
+    if (s && !s.error && s.price != null) addStat("Silver", `$${s.price.toFixed(2)}/oz`);
+    addStat("Reads as", "Oz of silver worth one oz of gold");
+    return;
+  }
+
   const q = state.quotes[item.id];
   if (!q || q.error) return;
 
@@ -452,6 +540,18 @@ async function loadChartData(item) {
       if (rangeDef && rangeDef.days) {
         const cutoff = Date.now() - rangeDef.days * 86400000;
         points = points.filter((p) => p.t >= cutoff);
+      }
+    } else if (item.kind === "ratio") {
+      const rangeDef = YF_RANGES.find((r) => r.key === state.activeRangeKey);
+      const [goldHist, silverHist] = await Promise.all([
+        invoke("get_history", { symbol: "GC=F", range: rangeDef.range, interval: rangeDef.interval }),
+        invoke("get_history", { symbol: "SI=F", range: rangeDef.range, interval: rangeDef.interval })
+      ]);
+      const silverByT = new Map(silverHist.points.map((p) => [p.t, p.c]));
+      points = [];
+      for (const gp of goldHist.points) {
+        const sc = silverByT.get(gp.t);
+        if (sc != null && sc !== 0) points.push({ t: gp.t, c: gp.c / sc });
       }
     } else {
       const rangeDef = YF_RANGES.find((r) => r.key === state.activeRangeKey);
