@@ -30,6 +30,13 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "RAPT ${{ github.ref_name }}"
-          releaseBody: "Windows installer below. Unsigned build — Windows SmartScreen will show an 'unknown publisher' warning on first run, that's expected for an app without a paid code-signing certificate. Click 'More info' -> 'Run anyway'."
+          releaseBody: |
+            ## Install
+
+            Download **`RAPT_*_x64-setup.exe`** below (not "Source code" — that's just a raw source snapshot, not the app) and run it. It's a normal installer: Next → Next → Install. Creates a Desktop shortcut and Start Menu entry, and RAPT opens like any other Windows app from there.
+
+            This build is unsigned (no paid code-signing certificate), so Windows SmartScreen will show an "unknown publisher" warning on first run. Click **More info → Run anyway**. Normal for a free/indie app, nothing wrong with the file.
+
+            "Start with Windows" is off by default — turn it on from the in-app Settings if you want RAPT to launch automatically at login.
           releaseDraft: true
           prerelease: false
